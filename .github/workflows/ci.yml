@@ -1,0 +1,84 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: |
+          cd pepe
+          npm ci
+      
+      - name: Run lint
+        run: |
+          cd pepe
+          npm run lint
+
+  build:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: |
+          cd pepe
+          npm ci
+      
+      - name: Build frontend
+        run: |
+          cd pepe
+          npm run build
+      
+      - name: Build backend
+        run: |
+          cd pepe/server
+          npm ci
+          npm run build
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Build Docker images
+        run: |
+          docker compose build
+      
+      - name: Tag images
+        run: |
+          docker tag pepe-frontend ghcr.io/${{ github.repository }}/frontend:latest
+          docker tag pepe-backend ghcr.io/${{ github.repository }}/backend:latest
+      
+      - name: Push to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - run: |
+          docker push ghcr.io/${{ github.repository }}/frontend:latest
+          docker push ghcr.io/${{ github.repository }}/backend:latest
