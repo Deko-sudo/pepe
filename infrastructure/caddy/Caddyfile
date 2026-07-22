@@ -1,29 +1,10 @@
 http://localhost {
-    @api path /api/*
-    @static path /assets/* /favicon.ico
-
-    handle @api {
-        reverse_proxy pepe-api:8000 {
-            header_up X-Real-IP {remote_host}
-            header_up X-Forwarded-For {remote_host}
-            header_up X-Forwarded-Proto {scheme}
-        }
-    }
-
-    handle @static {
-        root * /usr/share/nginx/html
-        file_server {
-            precompressed gzip br
-        }
-        header Cache-Control "public, max-age=31536000, immutable"
+    handle /api/* {
+        reverse_proxy api:8000
     }
 
     handle {
-        reverse_proxy pepe-mini-app:80 {
-            header_up X-Real-IP {remote_host}
-            header_up X-Forwarded-For {remote_host}
-            header_up X-Forwarded-Proto {scheme}
-        }
+        reverse_proxy mini-app:80
     }
 
     log {
