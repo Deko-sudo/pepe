@@ -1,31 +1,117 @@
-version: '3.8'
-
 services:
-  frontend:
+  mini-app:
+    container_name: pepe-mini-app
     build:
-      context: .
+      context: ./apps/mini-app
       dockerfile: Dockerfile
     ports:
-      - "3000:80"
-    depends_on:
-      - backend
+      - "4000:80"
     networks:
       - pepe-network
 
-  backend:
+  api:
+    container_name: pepe-api
     build:
-      context: ./server
+      context: ./apps/api
       dockerfile: Dockerfile
     ports:
-      - "3001:3001"
+      - "8100:8000"
     environment:
-      - NODE_ENV=production
-      - PORT=3001
+      - DATABASE_URL=postgresql+asyncpg://pepe:change_me@postgres:5432/pepe
+      - REDIS_URL=redis://redis:6379/0
+      - APP_ENV=${APP_ENV:-development}
     env_file:
       - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - pepe-network
+
+  bot:
+    container_name: pepe-bot
+    build:
+      context: ./apps/bot
+      dockerfile: Dockerfile
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - MINI_APP_URL=${MINI_APP_URL:-http://localhost}
+    env_file:
+      - .env
+    restart: unless-stopped
+    networks:
+      - pepe-network
+
+  worker:
+    container_name: pepe-worker
+    build:
+      context: ./apps/worker
+      dockerfile: Dockerfile
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - pepe-network
+
+  postgres:
+    container_name: pepe-postgres
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-pepe}
+      - POSTGRES_USER=${POSTGRES_USER:-pepe}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-change_me}
+    ports:
+      - "5433:5432"
+    volumes:
+      - pepe_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pepe} -d ${POSTGRES_DB:-pepe}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pepe-network
+
+  redis:
+    container_name: pepe-redis
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pepe-network
+
+  caddy:
+    container_name: pepe-caddy
+    image: caddy:2-alpine
+    ports:
+      - "8080:80"
+      - "443:443"
+    volumes:
+      - ./infrastructure/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - mini-app
+      - api
     networks:
       - pepe-network
 
 networks:
   pepe-network:
     driver: bridge
+
+volumes:
+  pepe_postgres_data:
+  caddy_data:
+  caddy_config:

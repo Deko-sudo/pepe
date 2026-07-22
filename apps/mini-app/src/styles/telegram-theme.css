@@ -1,0 +1,8 @@
+:root {
+  --app-bg: var(--tg-theme-bg-color, var(--color-bg-primary));
+  --app-text: var(--tg-theme-text-color, var(--color-text-primary));
+  --app-hint: var(--tg-theme-hint-color, var(--color-text-secondary));
+  --app-button: var(--tg-theme-button-color, var(--color-accent-primary));
+  --app-button-text: var(--tg-theme-button-text-color, #ffffff);
+  --app-secondary-bg: var(--tg-theme-secondary-bg-color, var(--color-bg-secondary));
+}
