@@ -20,6 +20,9 @@ services:
       - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://pepe:change_me@postgres:5432/pepe}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
       - APP_ENV=${APP_ENV:-development}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_INIT_DATA_MAX_AGE_SECONDS=${TELEGRAM_INIT_DATA_MAX_AGE_SECONDS:-3600}
+      - TELEGRAM_INIT_DATA_FUTURE_SKEW_SECONDS=${TELEGRAM_INIT_DATA_FUTURE_SKEW_SECONDS:-30}
     depends_on:
       postgres:
         condition: service_healthy

@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     mini_app_url: str = "http://localhost"
 
+    telegram_init_data_max_age_seconds: int = 3600
+    telegram_init_data_future_skew_seconds: int = 30
+
     cors_allowed_origins: str = "http://localhost,http://127.0.0.1"
     log_level: str = "INFO"
 

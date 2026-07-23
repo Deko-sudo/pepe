@@ -1,3 +1,5 @@
+import type { TelegramValidationState, TelegramUser } from "@/shared/api";
+
 export interface TelegramBridge {
   ready(): void;
   expand(): void;
@@ -8,4 +10,10 @@ export interface TelegramBridge {
   haptic(type: "light" | "medium" | "success" | "error"): void;
   showAlert(message: string): Promise<void>;
   onBackButton(callback: () => void): () => void;
+}
+
+export interface TelegramAuthState {
+  state: TelegramValidationState;
+  user: TelegramUser | null;
+  error: string | null;
 }
