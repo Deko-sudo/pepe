@@ -88,11 +88,13 @@ async def client() -> AsyncGenerator[tuple[AsyncClient, FakeDatabaseSession], No
         yield db
 
     app.dependency_overrides[get_db] = override_db
-    with patch.object(settings, "telegram_bot_token", BOT_TOKEN):
-        transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as async_client:
-            yield async_client, db
-    app.dependency_overrides.clear()
+    try:
+        with patch.object(settings, "telegram_bot_token", BOT_TOKEN):
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as async_client:
+                yield async_client, db
+    finally:
+        app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio
