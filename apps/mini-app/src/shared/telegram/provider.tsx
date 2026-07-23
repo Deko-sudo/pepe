@@ -1,9 +1,11 @@
-import React, { useMemo, useState, useEffect, useCallback } from "react";
-import { createTelegramBridge } from "./factory";
-import { TelegramContext, TelegramAuthContext } from "./context";
-import type { TelegramAuthState } from "./types";
-import { validateTelegramInitData, ApiError } from "@/shared/api";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+
+import { ApiError, exchangeTelegramSession, getCurrentUser } from "@/shared/api";
 import type { TelegramUser, TelegramValidationState } from "@/shared/api";
+
+import { TelegramAuthContext, TelegramContext } from "./context";
+import { createTelegramBridge } from "./factory";
+import type { TelegramAuthState } from "./types";
 
 interface TelegramProviderProps {
   children: React.ReactNode;
@@ -11,29 +13,47 @@ interface TelegramProviderProps {
 
 export function TelegramProvider({ children }: TelegramProviderProps) {
   const bridge = useMemo(() => createTelegramBridge(), []);
-
   const [state, setState] = useState<TelegramValidationState>("idle");
   const [user, setUser] = useState<TelegramUser | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const validate = useCallback(async () => {
-    const initData = bridge.getInitData();
-
-    if (!initData) {
-      setState("browser");
-      return;
-    }
-
+  const bootstrap = useCallback(async () => {
     setState("validating");
     setError(null);
 
     try {
-      const result = await validateTelegramInitData(initData);
-      setUser(result.user);
+      const sessionUser = await getCurrentUser();
+      setUser(sessionUser);
       setState("valid");
-    } catch (err) {
+      return;
+    } catch (sessionError) {
+      if (!(sessionError instanceof ApiError) || sessionError.status !== 401) {
+        setUser(null);
+        if (sessionError instanceof ApiError && sessionError.status === 503) {
+          setState("unavailable");
+          setError("Проверка Telegram временно недоступна.");
+        } else {
+          setState("invalid");
+          setError("Не удалось восстановить сессию.");
+        }
+        return;
+      }
+    }
+
+    const initData = bridge.getInitData();
+    if (!initData) {
       setUser(null);
-      if (err instanceof ApiError && err.status === 503) {
+      setState("browser");
+      return;
+    }
+
+    try {
+      const sessionUser = await exchangeTelegramSession(initData);
+      setUser(sessionUser);
+      setState("valid");
+    } catch (exchangeError) {
+      setUser(null);
+      if (exchangeError instanceof ApiError && exchangeError.status === 503) {
         setState("unavailable");
         setError("Проверка Telegram временно недоступна.");
       } else {
@@ -46,12 +66,12 @@ export function TelegramProvider({ children }: TelegramProviderProps) {
   }, [bridge]);
 
   useEffect(() => {
-    validate();
-  }, [validate]);
+    void bootstrap();
+  }, [bootstrap]);
 
   const authContext: TelegramAuthState = useMemo(
     () => ({ state, user, error }),
-    [state, user, error],
+    [error, state, user],
   );
 
   return (

@@ -9,6 +9,12 @@ http://localhost {
 
     log {
         output stdout
-        format json
+        format filter {
+            wrap json
+            fields {
+                request>headers delete
+                resp_headers delete
+            }
+        }
     }
 }

@@ -10,7 +10,7 @@ Telegram Mini App для рыночной аналитики криптовал�
 
 **Этап 3 — Telegram users persistence** — completed and merged.
 
-**Этап 4 — Sessions and API authorization** — planning, blocked pending contract approval. Not implemented.
+**Этап 4 — Sessions and API authorization** — implementation in progress in feature branch / PR. Not merged.
 
 **Прогресс:** completed 3/12, remaining 9/12, progress by stages 25%.
 
@@ -29,7 +29,7 @@ Telegram Mini App для рыночной аналитики криптовал�
 11. AI Support and notifications — not started.
 12. Production hardening and launch — not started.
 
-Официальный proposed Stage 4 document: [docs/architecture/stage-4-sessions-api-authorization.md](docs/architecture/stage-4-sessions-api-authorization.md). Реализация запрещена до явного утверждения контракта пользователем.
+Официальный Stage 4 contract and implementation record: [docs/architecture/stage-4-sessions-api-authorization.md](docs/architecture/stage-4-sessions-api-authorization.md). Completed and merged stages remain 1–3; Stage 4 is not completed or merged.
 
 ## Контекст будущих этапов (не реализовано)
 
