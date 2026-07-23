@@ -7,6 +7,7 @@ import logging
 import time
 from collections.abc import AsyncGenerator
 from unittest.mock import patch
+from urllib.parse import urlencode
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -79,18 +80,12 @@ def build_init_data(
 STATIC_TOKEN = "1234567890:ABCdefGHIjklMNOpqrsTUVwxyz"  # noqa: S105
 STATIC_AUTH_DATE = 1710000000
 STATIC_USER = '{"id":123456789,"first_name":"Test","username":"test_user"}'
-STATIC_DATA_CHECK = f"auth_date={STATIC_AUTH_DATE}\nuser={STATIC_USER}"
-STATIC_SECRET_KEY = hmac.new(
-    key=b"WebAppData",
-    msg=STATIC_TOKEN.encode("utf-8"),
-    digestmod=hashlib.sha256,
-).digest()
-STATIC_HASH = hmac.new(
-    key=STATIC_SECRET_KEY,
-    msg=STATIC_DATA_CHECK.encode("utf-8"),
-    digestmod=hashlib.sha256,
-).hexdigest()
-STATIC_INIT_DATA = f"auth_date={STATIC_AUTH_DATE}&user={STATIC_USER}&hash={STATIC_HASH}"
+STATIC_HASH = "d2b1599ee887023b24f005a20109718949effd444416ee1c3dd12ba0b7c2701a"
+STATIC_INIT_DATA = (
+    "auth_date=1710000000&user=%7B%22id%22%3A123456789%2C%22first_name%22"
+    "%3A%22Test%22%2C%22username%22%3A%22test_user%22%7D&hash="
+    "d2b1599ee887023b24f005a20109718949effd444416ee1c3dd12ba0b7c2701a"
+)
 
 
 @pytest.fixture
@@ -113,6 +108,52 @@ async def test_valid_init_data(client: AsyncClient) -> None:
     assert data["status"] == "valid"
     assert data["user"]["telegram_id"] == 123456789
     assert data["user"]["first_name"] == "Иван"
+
+
+@pytest.mark.asyncio
+async def test_valid_init_data_with_reordered_percent_encoded_pairs(
+    client: AsyncClient,
+) -> None:
+    auth_date = 1710000000
+    user = {"id": 987654321, "first_name": "Тест", "username": "test_user"}
+    user_json = json.dumps(user, separators=(",", ":"), ensure_ascii=False)
+    pairs = [
+        ("user", user_json),
+        ("query_id", "AAHdF6IQAAAAAN0XohDhrOrc"),
+        ("auth_date", str(auth_date)),
+    ]
+    data_check_string = "\n".join(
+        f"{key}={value}" for key, value in sorted(pairs, key=lambda item: item[0])
+    )
+    secret_key = hmac.new(
+        key=b"WebAppData",
+        msg=BOT_TOKEN.encode("utf-8"),
+        digestmod=hashlib.sha256,
+    ).digest()
+    signature = hmac.new(
+        key=secret_key,
+        msg=data_check_string.encode("utf-8"),
+        digestmod=hashlib.sha256,
+    ).hexdigest()
+    init_data = urlencode([*pairs, ("hash", signature)])
+
+    with patch("app.services.telegram_init_data.time.time", return_value=float(auth_date)):
+        response = await client.post(
+            "/api/v1/auth/telegram/validate",
+            json={"init_data": init_data},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["user"] == {
+        "telegram_id": 987654321,
+        "first_name": "Тест",
+        "last_name": None,
+        "username": "test_user",
+        "language_code": None,
+        "is_premium": False,
+        "allows_write_to_pm": None,
+        "photo_url": None,
+    }
 
 
 @pytest.mark.asyncio
@@ -187,7 +228,17 @@ async def test_missing_hash(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_missing_auth_date(client: AsyncClient) -> None:
     user_str = json.dumps(TEST_USER, separators=(",", ":"), ensure_ascii=False)
-    init_data = f"user={user_str}"
+    secret_key = hmac.new(
+        key=b"WebAppData",
+        msg=BOT_TOKEN.encode("utf-8"),
+        digestmod=hashlib.sha256,
+    ).digest()
+    computed_hash = hmac.new(
+        key=secret_key,
+        msg=f"user={user_str}".encode(),
+        digestmod=hashlib.sha256,
+    ).hexdigest()
+    init_data = urlencode([("user", user_str), ("hash", computed_hash)])
     response = await client.post(
         "/api/v1/auth/telegram/validate",
         json={"init_data": init_data},
@@ -271,9 +322,23 @@ async def test_malformed_user_json(client: AsyncClient) -> None:
 async def test_duplicate_hash_key(client: AsyncClient) -> None:
     auth_date = int(time.time())
     user_str = json.dumps(TEST_USER, separators=(",", ":"), ensure_ascii=False)
-    init_data = (
-        f"auth_date={auth_date}&user={user_str}"
-        f"&hash=abc&hash=def"
+    secret_key = hmac.new(
+        key=b"WebAppData",
+        msg=BOT_TOKEN.encode("utf-8"),
+        digestmod=hashlib.sha256,
+    ).digest()
+    computed_hash = hmac.new(
+        key=secret_key,
+        msg=f"auth_date={auth_date}\nuser={user_str}".encode(),
+        digestmod=hashlib.sha256,
+    ).hexdigest()
+    init_data = urlencode(
+        [
+            ("auth_date", str(auth_date)),
+            ("user", user_str),
+            ("hash", computed_hash),
+            ("hash", computed_hash),
+        ],
     )
     response = await client.post(
         "/api/v1/auth/telegram/validate",
@@ -287,11 +352,26 @@ async def test_duplicate_hash_key(client: AsyncClient) -> None:
 async def test_duplicate_unknown_key(client: AsyncClient) -> None:
     auth_date = int(time.time())
     user_str = json.dumps(TEST_USER, separators=(",", ":"), ensure_ascii=False)
-    init_data = (
-        f"auth_date={auth_date}&user={user_str}"
-        f"&custom=abc&custom=def"
-        f"&hash=abc123"
+    pairs = [
+        ("auth_date", str(auth_date)),
+        ("user", user_str),
+        ("custom", "abc"),
+        ("custom", "def"),
+    ]
+    data_check_string = "\n".join(
+        f"{key}={value}" for key, value in sorted(pairs, key=lambda item: item[0])
     )
+    secret_key = hmac.new(
+        key=b"WebAppData",
+        msg=BOT_TOKEN.encode("utf-8"),
+        digestmod=hashlib.sha256,
+    ).digest()
+    computed_hash = hmac.new(
+        key=secret_key,
+        msg=data_check_string.encode("utf-8"),
+        digestmod=hashlib.sha256,
+    ).hexdigest()
+    init_data = urlencode([*pairs, ("hash", computed_hash)])
     response = await client.post(
         "/api/v1/auth/telegram/validate",
         json={"init_data": init_data},

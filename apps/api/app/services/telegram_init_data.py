@@ -91,11 +91,11 @@ def validate_telegram_init_data(
         ) from err
 
     # Step 5: Build data-check-string (exclude hash, sort by key)
-    data_check_pairs = []
-    for key, value in raw_pairs:
-        if key == "hash":
-            continue
-        data_check_pairs.append(f"{key}={value}")
+    data_check_pairs = [
+        f"{key}={value}"
+        for key, value in sorted(raw_pairs, key=lambda item: item[0])
+        if key != "hash"
+    ]
     data_check_string = "\n".join(data_check_pairs)
 
     # Step 6: HMAC-SHA-256 verification (BEFORE parsing user/auth_date)

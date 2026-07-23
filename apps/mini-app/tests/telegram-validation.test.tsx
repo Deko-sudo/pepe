@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
 import { TelegramProvider } from "../src/shared/telegram/provider";
 import { useTelegramAuth } from "../src/shared/telegram/context";
+import { ApiError, validateTelegramInitData } from "../src/shared/api";
 
 function installMockWebApp(initData?: string) {
   (window as Record<string, unknown>).Telegram = {
@@ -140,6 +141,43 @@ describe("Telegram Validation - Telegram Mode", () => {
       expect(screen.getByTestId("state").textContent).toBe("unavailable");
     });
   });
+
+  it("shows unavailable state on 503 response with an empty body", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(null, { status: 503 }));
+
+    renderWithProviders();
+    await waitFor(() => {
+      expect(screen.getByTestId("state").textContent).toBe("unavailable");
+    });
+  });
+
+  it("shows unavailable state on 503 response with an HTML body", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response("<html><body>Service unavailable</body></html>", {
+        status: 503,
+        headers: { "Content-Type": "text/html" },
+      }),
+    );
+
+    renderWithProviders();
+    await waitFor(() => {
+      expect(screen.getByTestId("state").textContent).toBe("unavailable");
+    });
+  });
+
+  it("shows invalid state on 401 response with an HTML body", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response("<html><body>Unauthorized</body></html>", {
+        status: 401,
+        headers: { "Content-Type": "text/html" },
+      }),
+    );
+
+    renderWithProviders();
+    await waitFor(() => {
+      expect(screen.getByTestId("state").textContent).toBe("invalid");
+    });
+  });
 });
 
 describe("Telegram Validation - Storage", () => {
@@ -206,6 +244,34 @@ describe("Telegram Validation - Zod Rejection", () => {
     renderWithProviders();
     await waitFor(() => {
       expect(screen.getByTestId("state").textContent).toBe("invalid");
+    });
+  });
+
+  it("shows invalid state on successful response with malformed JSON", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response("{invalid-json", { status: 200 }),
+    );
+
+    renderWithProviders();
+    await waitFor(() => {
+      expect(screen.getByTestId("state").textContent).toBe("invalid");
+    });
+  });
+});
+
+describe("Telegram Validation - API errors", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("preserves the actual HTTP status in ApiError", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(null, { status: 503 }),
+    );
+
+    await expect(validateTelegramInitData("init-data")).rejects.toMatchObject<ApiError>({
+      name: "ApiError",
+      status: 503,
     });
   });
 });

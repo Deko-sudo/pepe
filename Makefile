@@ -23,15 +23,15 @@ ps: ## Show running containers
 
 test: ## Run all tests
 	cd apps/mini-app && npm test
-	cd apps/api && python -m pytest
-	cd apps/bot && python -m pytest
-	cd apps/worker && python -m pytest
+	cd apps/api && .venv/bin/python -m pytest
+	cd apps/bot && .venv/bin/python -m pytest
+	cd apps/worker && .venv/bin/python -m pytest
 
 lint: ## Run linters
 	cd apps/mini-app && npm run lint
-	cd apps/api && ruff check .
-	cd apps/bot && ruff check .
-	cd apps/worker && ruff check .
+	cd apps/api && .venv/bin/ruff check .
+	cd apps/bot && .venv/bin/ruff check .
+	cd apps/worker && .venv/bin/ruff check .
 
 format: ## Format code
 	cd apps/mini-app && npm run lint -- --fix
@@ -41,9 +41,9 @@ format: ## Format code
 
 typecheck: ## Run type checkers
 	cd apps/mini-app && npm run typecheck
-	cd apps/api && mypy .
-	cd apps/bot && mypy .
-	cd apps/worker && mypy .
+	cd apps/api && .venv/bin/mypy .
+	cd apps/bot && .venv/bin/mypy .
+	cd apps/worker && .venv/bin/mypy .
 
 migrate: ## Run database migrations
 	cd apps/api && alembic upgrade head

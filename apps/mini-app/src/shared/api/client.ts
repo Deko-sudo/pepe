@@ -13,6 +13,25 @@ export class ApiError extends Error {
   }
 }
 
+async function parseErrorDetail(response: Response): Promise<string | null> {
+  try {
+    const data: unknown = await response.json();
+
+    if (
+      typeof data === "object" &&
+      data !== null &&
+      "detail" in data &&
+      typeof data.detail === "string"
+    ) {
+      return data.detail;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
 export async function validateTelegramInitData(
   initData: string,
 ): Promise<TelegramValidateResponse> {
@@ -22,11 +41,11 @@ export async function validateTelegramInitData(
     body: JSON.stringify({ init_data: initData }),
   });
 
-  const data = await response.json();
-
   if (!response.ok) {
-    throw new ApiError(data.detail || "Validation failed", response.status);
+    const detail = await parseErrorDetail(response);
+    throw new ApiError(detail ?? `HTTP ${response.status}`, response.status);
   }
 
+  const data: unknown = await response.json();
   return TelegramValidateResponseSchema.parse(data);
 }
