@@ -6,7 +6,7 @@ Telegram Mini App для рыночной аналитики криптовал�
 
 **Этап 1** — Технический фундамент.
 
-Статус: 🔄 В разработке
+Статус: В разработке
 
 ## Границы этапа
 
@@ -78,6 +78,18 @@ cp .env.example .env
 
 3. Отредактируйте `.env` при необходимости.
 
+### Порты
+
+Все внешние порты параметризуются через переменные окружения в `.env`:
+
+| Переменная | По умолчанию | Описание |
+|---|---|---|
+| `MINI_APP_PORT` | `4000` | Mini App (Nginx) |
+| `API_EXT_PORT` | `8100` | FastAPI |
+| `POSTGRES_PORT` | `5433` | PostgreSQL |
+| `REDIS_PORT` | `6380` | Redis |
+| `CADDY_PORT` | `8080` | Caddy reverse proxy |
+
 ## Запуск
 
 ### Docker Compose (рекомендуется)
@@ -143,12 +155,12 @@ make migrate    # Применить миграции
 
 | Сервис | URL |
 |---|---|
-| Mini App | http://localhost:3000 |
-| API | http://localhost:8000 |
-| API Docs | http://localhost:8000/docs |
-| PostgreSQL | localhost:5432 |
-| Redis | localhost:6379 |
-| Caddy | http://localhost |
+| Mini App | http://localhost:${MINI_APP_PORT:-4000} |
+| API | http://localhost:${API_EXT_PORT:-8100} |
+| API Docs | http://localhost:${API_EXT_PORT:-8100}/docs |
+| PostgreSQL | localhost:${POSTGRES_PORT:-5433} |
+| Redis | localhost:${REDIS_PORT:-6380} |
+| Caddy | http://localhost:${CADDY_PORT:-8080} |
 
 ## Миграции
 
@@ -232,7 +244,7 @@ Telegram Mini App с страницами:
 FastAPI сервис с эндпоинтами:
 
 - `GET /api/v1/health` — Проверка здоровья
-- `GET /api/v1/ready` — Проверка зависимостей
+- `GET /api/v1/ready` — Проверка зависимостей (200 OK / 503 Service Unavailable)
 - `GET /api/v1/version` — Информация о версии
 
 ## Bot

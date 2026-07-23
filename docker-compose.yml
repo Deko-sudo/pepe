@@ -5,7 +5,7 @@ services:
       context: ./apps/mini-app
       dockerfile: Dockerfile
     ports:
-      - "4000:80"
+      - "${MINI_APP_PORT:-4000}:80"
     networks:
       - pepe-network
 
@@ -15,16 +15,22 @@ services:
       context: ./apps/api
       dockerfile: Dockerfile
     ports:
-      - "8100:8000"
+      - "${API_EXT_PORT:-8100}:8000"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://pepe:change_me@postgres:5432/pepe
-      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://pepe:change_me@postgres:5432/pepe}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
       - APP_ENV=${APP_ENV:-development}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
       - pepe-network
 
@@ -36,6 +42,12 @@ services:
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
       - MINI_APP_URL=${MINI_APP_URL:-http://localhost}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; os.kill(1, 0)"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
     restart: unless-stopped
     networks:
       - pepe-network
@@ -46,10 +58,16 @@ services:
       context: ./apps/worker
       dockerfile: Dockerfile
     environment:
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
     depends_on:
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; os.kill(1, 0)"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
       - pepe-network
 
@@ -61,7 +79,7 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-pepe}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-change_me}
     ports:
-      - "5433:5432"
+      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       - pepe_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -76,7 +94,7 @@ services:
     container_name: pepe-redis
     image: redis:7-alpine
     ports:
-      - "6380:6379"
+      - "${REDIS_PORT:-6380}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -89,7 +107,7 @@ services:
     container_name: pepe-caddy
     image: caddy:2-alpine
     ports:
-      - "8080:80"
+      - "${CADDY_PORT:-8080}:80"
       - "443:443"
     volumes:
       - ./infrastructure/caddy/Caddyfile:/etc/caddy/Caddyfile:ro

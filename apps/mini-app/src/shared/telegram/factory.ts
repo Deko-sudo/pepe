@@ -2,8 +2,32 @@ import type { TelegramBridge } from "./types";
 
 declare global {
   interface Window {
-    TelegramWebApp?: unknown;
-    __INIT_DATA__?: unknown;
+    Telegram?: {
+      WebApp?: {
+        ready(): void;
+        expand(): void;
+        initData: string;
+        colorScheme: "light" | "dark";
+        themeParams: {
+          bg_color?: string;
+          text_color?: string;
+          hint_color?: string;
+          link_color?: string;
+          button_color?: string;
+          button_text_color?: string;
+        };
+        BackButton: {
+          show(): void;
+          hide(): void;
+          onClick(callback: () => void): void;
+          offClick(callback: () => void): void;
+        };
+        HapticFeedback: {
+          impactOccurred(type: "light" | "medium" | "success" | "error"): void;
+        };
+        showAlert(message: string, callback?: () => void): void;
+      };
+    };
   }
 }
 
@@ -11,17 +35,21 @@ function isTelegramWebView(): boolean {
   try {
     return (
       typeof window !== "undefined" &&
-      Boolean(window.TelegramWebApp || window.__INIT_DATA__)
+      Boolean(window.Telegram?.WebApp)
     );
   } catch {
     return false;
   }
 }
 
+function getWebApp(): NonNullable<NonNullable<Window["Telegram"]>["WebApp"]> {
+  return window.Telegram!.WebApp!;
+}
+
 class TelegramWebAppBridge implements TelegramBridge {
   ready(): void {
     try {
-      (window as unknown as Record<string, { ready: () => void }>).TelegramWebApp?.ready?.();
+      getWebApp().ready();
     } catch {
       // Silent fail
     }
@@ -29,7 +57,7 @@ class TelegramWebAppBridge implements TelegramBridge {
 
   expand(): void {
     try {
-      (window as unknown as Record<string, { expand: () => void }>).TelegramWebApp?.expand?.();
+      getWebApp().expand();
     } catch {
       // Silent fail
     }
@@ -37,7 +65,7 @@ class TelegramWebAppBridge implements TelegramBridge {
 
   getInitData(): string {
     try {
-      return typeof window.__INIT_DATA__ === "string" ? window.__INIT_DATA__ : "";
+      return getWebApp().initData ?? "";
     } catch {
       return "";
     }
@@ -45,26 +73,15 @@ class TelegramWebAppBridge implements TelegramBridge {
 
   getColorScheme(): "light" | "dark" {
     try {
-      const app = window.TelegramWebApp as Record<string, unknown> | undefined;
-      const themeParams = app?.themeParams as Record<string, string> | undefined;
-      const bg = themeParams?.bg_color;
-      if (bg) {
-        const hex = bg.replace("#", "");
-        const r = parseInt(hex.substring(0, 2), 16);
-        const g = parseInt(hex.substring(2, 4), 16);
-        const b = parseInt(hex.substring(4, 6), 16);
-        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-        return luminance > 0.5 ? "light" : "dark";
-      }
+      return getWebApp().colorScheme;
     } catch {
-      // Fall through
+      return "dark";
     }
-    return "dark";
   }
 
   showBackButton(): void {
     try {
-      (window as unknown as Record<string, { showBackButton: () => void }>).TelegramWebApp?.showBackButton?.();
+      getWebApp().BackButton.show();
     } catch {
       // Silent fail
     }
@@ -72,17 +89,15 @@ class TelegramWebAppBridge implements TelegramBridge {
 
   hideBackButton(): void {
     try {
-      (window as unknown as Record<string, { hideBackButton: () => void }>).TelegramWebApp?.hideBackButton?.();
+      getWebApp().BackButton.hide();
     } catch {
       // Silent fail
     }
   }
 
-  haptic(_type: "light" | "medium" | "success" | "error"): void {
+  haptic(type: "light" | "medium" | "success" | "error"): void {
     try {
-      const app = window.TelegramWebApp as Record<string, unknown> | undefined;
-      const haptic = app?.HapticFeedback as Record<string, (s: string) => void> | undefined;
-      haptic?.impactOccurred?.(_type);
+      getWebApp().HapticFeedback.impactOccurred(type);
     } catch {
       // Silent fail
     }
@@ -90,7 +105,7 @@ class TelegramWebAppBridge implements TelegramBridge {
 
   async showAlert(message: string): Promise<void> {
     try {
-      (window as unknown as Record<string, { showAlert: (m: string) => void }>).TelegramWebApp?.showAlert?.(message);
+      getWebApp().showAlert(message);
     } catch {
       window.alert(message);
     }
@@ -98,11 +113,17 @@ class TelegramWebAppBridge implements TelegramBridge {
 
   onBackButton(callback: () => void): () => void {
     try {
-      (window as unknown as Record<string, { onBackButton: (cb: () => void) => void }>).TelegramWebApp?.onBackButton?.(callback);
+      getWebApp().BackButton.onClick(callback);
     } catch {
       // Silent fail
     }
-    return () => {};
+    return () => {
+      try {
+        getWebApp().BackButton.offClick(callback);
+      } catch {
+        // Silent fail
+      }
+    };
   }
 }
 
