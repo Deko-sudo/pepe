@@ -32,15 +32,15 @@ async def validate_telegram_init_data_endpoint(
         )
     except TelegramInitDataError as e:
         if e.code == "unavailable":
-            status_code = 503
-        elif e.code in ("invalid", "expired"):
-            status_code = 401
-        else:
-            status_code = 422
+            return JSONResponse(
+                status_code=503,
+                content={"detail": "Проверка Telegram временно недоступна."},
+            )
 
+        # invalid, expired, malformed — all return the same generic message
         return JSONResponse(
-            status_code=status_code,
-            content={"detail": e.message},
+            status_code=401,
+            content={"detail": "Не удалось подтвердить данные Telegram."},  # noqa: RUF001
         )
 
     return JSONResponse(status_code=200, content=result)

@@ -3,10 +3,10 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import time
 from collections.abc import AsyncGenerator
 from unittest.mock import patch
-from urllib.parse import quote
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -25,6 +25,8 @@ TEST_USER: dict[str, object] = {
     "allows_write_to_pm": True,
     "photo_url": "https://example.com/photo.jpg",
 }
+
+GENERIC_ERROR = "Не удалось подтвердить данные Telegram."  # noqa: RUF001
 
 
 def build_init_data(
@@ -72,6 +74,25 @@ def build_init_data(
     return "&".join(f"{k}={v}" for k, v in pairs)
 
 
+# --- Static test vector (pre-computed, independent of helper) ---
+
+STATIC_TOKEN = "1234567890:ABCdefGHIjklMNOpqrsTUVwxyz"  # noqa: S105
+STATIC_AUTH_DATE = 1710000000
+STATIC_USER = '{"id":123456789,"first_name":"Test","username":"test_user"}'
+STATIC_DATA_CHECK = f"auth_date={STATIC_AUTH_DATE}\nuser={STATIC_USER}"
+STATIC_SECRET_KEY = hmac.new(
+    key=b"WebAppData",
+    msg=STATIC_TOKEN.encode("utf-8"),
+    digestmod=hashlib.sha256,
+).digest()
+STATIC_HASH = hmac.new(
+    key=STATIC_SECRET_KEY,
+    msg=STATIC_DATA_CHECK.encode("utf-8"),
+    digestmod=hashlib.sha256,
+).hexdigest()
+STATIC_INIT_DATA = f"auth_date={STATIC_AUTH_DATE}&user={STATIC_USER}&hash={STATIC_HASH}"
+
+
 @pytest.fixture
 async def client() -> AsyncGenerator[AsyncClient, None]:
     with patch.object(settings, "telegram_bot_token", BOT_TOKEN):
@@ -95,6 +116,19 @@ async def test_valid_init_data(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_static_test_vector(client: AsyncClient) -> None:
+    with patch("app.services.telegram_init_data.time.time", return_value=float(STATIC_AUTH_DATE)):
+        response = await client.post(
+            "/api/v1/auth/telegram/validate",
+            json={"init_data": STATIC_INIT_DATA},
+        )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "valid"
+    assert data["user"]["telegram_id"] == 123456789
+
+
+@pytest.mark.asyncio
 async def test_tampered_user(client: AsyncClient) -> None:
     init_data = build_init_data(user=TEST_USER)
     original_user_str = json.dumps(TEST_USER, separators=(",", ":"), ensure_ascii=False)
@@ -109,20 +143,11 @@ async def test_tampered_user(client: AsyncClient) -> None:
         json={"init_data": init_data},
     )
     assert response.status_code == 401
+    assert response.json()["detail"] == GENERIC_ERROR
 
 
 @pytest.mark.asyncio
-async def test_tampered_auth_date(client: AsyncClient) -> None:
-    init_data = build_init_data(auth_date=1000000000)
-    response = await client.post(
-        "/api/v1/auth/telegram/validate",
-        json={"init_data": init_data},
-    )
-    assert response.status_code == 401
-
-
-@pytest.mark.asyncio
-async def test_wrong_hash(client: AsyncClient) -> None:
+async def test_tampered_hash(client: AsyncClient) -> None:
     init_data = build_init_data()
     init_data = init_data.replace(
         init_data.split("hash=")[1], "a" * 64,
@@ -132,6 +157,7 @@ async def test_wrong_hash(client: AsyncClient) -> None:
         json={"init_data": init_data},
     )
     assert response.status_code == 401
+    assert response.json()["detail"] == GENERIC_ERROR
 
 
 @pytest.mark.asyncio
@@ -142,29 +168,32 @@ async def test_wrong_bot_token(client: AsyncClient) -> None:
         json={"init_data": init_data},
     )
     assert response.status_code == 401
+    assert response.json()["detail"] == GENERIC_ERROR
 
 
 @pytest.mark.asyncio
 async def test_missing_hash(client: AsyncClient) -> None:
-    user_str = json.dumps(TEST_USER, separators=(",", ":"), ensure_ascii=False)
     auth_date = int(time.time())
-    init_data = f"auth_date={auth_date}&user={quote(user_str, safe='')}"
+    user_str = json.dumps(TEST_USER, separators=(",", ":"), ensure_ascii=False)
+    init_data = f"auth_date={auth_date}&user={user_str}"
     response = await client.post(
         "/api/v1/auth/telegram/validate",
         json={"init_data": init_data},
     )
-    assert response.status_code == 422
+    assert response.status_code == 401
+    assert response.json()["detail"] == GENERIC_ERROR
 
 
 @pytest.mark.asyncio
 async def test_missing_auth_date(client: AsyncClient) -> None:
     user_str = json.dumps(TEST_USER, separators=(",", ":"), ensure_ascii=False)
-    init_data = f"user={quote(user_str, safe='')}"
+    init_data = f"user={user_str}"
     response = await client.post(
         "/api/v1/auth/telegram/validate",
         json={"init_data": init_data},
     )
-    assert response.status_code == 422
+    assert response.status_code == 401
+    assert response.json()["detail"] == GENERIC_ERROR
 
 
 @pytest.mark.asyncio
@@ -186,7 +215,8 @@ async def test_missing_user(client: AsyncClient) -> None:
         "/api/v1/auth/telegram/validate",
         json={"init_data": init_data},
     )
-    assert response.status_code == 422
+    assert response.status_code == 401
+    assert response.json()["detail"] == GENERIC_ERROR
 
 
 @pytest.mark.asyncio
@@ -198,6 +228,7 @@ async def test_expired_auth_date(client: AsyncClient) -> None:
         json={"init_data": init_data},
     )
     assert response.status_code == 401
+    assert response.json()["detail"] == GENERIC_ERROR
 
 
 @pytest.mark.asyncio
@@ -209,6 +240,7 @@ async def test_future_auth_date(client: AsyncClient) -> None:
         json={"init_data": init_data},
     )
     assert response.status_code == 401
+    assert response.json()["detail"] == GENERIC_ERROR
 
 
 @pytest.mark.asyncio
@@ -231,22 +263,41 @@ async def test_malformed_user_json(client: AsyncClient) -> None:
         "/api/v1/auth/telegram/validate",
         json={"init_data": init_data},
     )
-    assert response.status_code == 422
+    assert response.status_code == 401
+    assert response.json()["detail"] == GENERIC_ERROR
 
 
 @pytest.mark.asyncio
-async def test_duplicate_key(client: AsyncClient) -> None:
+async def test_duplicate_hash_key(client: AsyncClient) -> None:
     auth_date = int(time.time())
     user_str = json.dumps(TEST_USER, separators=(",", ":"), ensure_ascii=False)
     init_data = (
-        f"auth_date={auth_date}&auth_date={auth_date}"
-        f"&user={quote(user_str, safe='')}&hash=abc"
+        f"auth_date={auth_date}&user={user_str}"
+        f"&hash=abc&hash=def"
     )
     response = await client.post(
         "/api/v1/auth/telegram/validate",
         json={"init_data": init_data},
     )
-    assert response.status_code == 422
+    assert response.status_code == 401
+    assert response.json()["detail"] == GENERIC_ERROR
+
+
+@pytest.mark.asyncio
+async def test_duplicate_unknown_key(client: AsyncClient) -> None:
+    auth_date = int(time.time())
+    user_str = json.dumps(TEST_USER, separators=(",", ":"), ensure_ascii=False)
+    init_data = (
+        f"auth_date={auth_date}&user={user_str}"
+        f"&custom=abc&custom=def"
+        f"&hash=abc123"
+    )
+    response = await client.post(
+        "/api/v1/auth/telegram/validate",
+        json={"init_data": init_data},
+    )
+    assert response.status_code == 401
+    assert response.json()["detail"] == GENERIC_ERROR
 
 
 @pytest.mark.asyncio
@@ -256,7 +307,8 @@ async def test_too_long_input(client: AsyncClient) -> None:
         "/api/v1/auth/telegram/validate",
         json={"init_data": long_data},
     )
-    assert response.status_code == 422
+    assert response.status_code == 401
+    assert response.json()["detail"] == GENERIC_ERROR
 
 
 @pytest.mark.asyncio
@@ -265,23 +317,13 @@ async def test_empty_init_data(client: AsyncClient) -> None:
         "/api/v1/auth/telegram/validate",
         json={"init_data": ""},
     )
-    assert response.status_code == 422
+    assert response.status_code == 401
+    assert response.json()["detail"] == GENERIC_ERROR
 
 
 @pytest.mark.asyncio
-async def test_unicode_in_username(client: AsyncClient) -> None:
+async def test_unicode_in_user_fields(client: AsyncClient) -> None:
     user: dict[str, object] = {**TEST_USER, "first_name": "Иван", "username": "ivan_петров"}
-    init_data = build_init_data(user=user)
-    response = await client.post(
-        "/api/v1/auth/telegram/validate",
-        json={"init_data": init_data},
-    )
-    assert response.status_code == 200
-
-
-@pytest.mark.asyncio
-async def test_url_encoded_fields(client: AsyncClient) -> None:
-    user: dict[str, object] = {**TEST_USER, "first_name": "Иван Петров"}
     init_data = build_init_data(user=user)
     response = await client.post(
         "/api/v1/auth/telegram/validate",
@@ -301,3 +343,20 @@ async def test_secrets_not_in_response(client: AsyncClient) -> None:
     assert BOT_TOKEN not in body
     assert "secret_key" not in body
     assert "WebAppData" not in body
+
+
+@pytest.mark.asyncio
+async def test_secrets_not_in_logs(
+    client: AsyncClient,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    init_data = build_init_data()
+    with caplog.at_level(logging.INFO):
+        await client.post(
+            "/api/v1/auth/telegram/validate",
+            json={"init_data": init_data},
+        )
+    for record in caplog.records:
+        assert BOT_TOKEN not in record.message
+        assert "WebAppData" not in record.message
+        assert "secret_key" not in record.message

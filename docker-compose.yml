@@ -6,6 +6,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - "${MINI_APP_PORT:-4000}:80"
+    depends_on:
+      - api
     networks:
       - pepe-network
 

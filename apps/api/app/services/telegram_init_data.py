@@ -5,7 +5,7 @@ import hmac
 import json
 import logging
 import time
-from urllib.parse import parse_qs
+from urllib.parse import parse_qsl
 
 logger = logging.getLogger(__name__)
 
@@ -35,78 +35,70 @@ def validate_telegram_init_data(
 
     if not init_data:
         raise TelegramInitDataError(
-            "init_data is required.",
+            "Malformed init data.",
             "malformed",
         )
 
     if len(init_data) > MAX_INIT_DATA_LENGTH:
         raise TelegramInitDataError(
-            "init_data is too long.",
+            "Malformed init data.",
             "malformed",
         )
 
-    pairs = parse_qs(init_data, keep_blank_values=False)
+    # Step 1: Parse all key=value pairs (preserve order for duplicate check)
+    raw_pairs = parse_qsl(init_data, keep_blank_values=True)
 
-    for key in ("hash", "auth_date", "user"):
-        if key not in pairs:
+    if not raw_pairs:
+        raise TelegramInitDataError(
+            "Malformed init data.",
+            "malformed",
+        )
+
+    # Step 2: Reject ANY duplicate keys
+    seen_keys: set[str] = set()
+    for key, _value in raw_pairs:
+        if key in seen_keys:
             raise TelegramInitDataError(
-                "Missing required field.",
+                "Malformed init data.",
+                "malformed",
+            )
+        seen_keys.add(key)
+
+    # Step 3: Check required fields
+    pairs_dict = dict(raw_pairs)
+    for required in ("hash", "auth_date", "user"):
+        if required not in pairs_dict:
+            raise TelegramInitDataError(
+                "Malformed init data.",
                 "malformed",
             )
 
-    if len(pairs.get("hash", [])) > 1:
-        raise TelegramInitDataError("Duplicate key.", "malformed")
-    if len(pairs.get("auth_date", [])) > 1:
-        raise TelegramInitDataError("Duplicate key.", "malformed")
-    if len(pairs.get("user", [])) > 1:
-        raise TelegramInitDataError("Duplicate key.", "malformed")
+    received_hash = pairs_dict["hash"]
 
-    received_hash = pairs["hash"][0]
+    # Step 4: Validate hash format (64 hex chars)
     if len(received_hash) != HASH_LENGTH:
-        raise TelegramInitDataError("Invalid signature.", "invalid")
+        raise TelegramInitDataError(
+            "Invalid signature.",
+            "invalid",
+        )
 
     try:
         bytes.fromhex(received_hash)
     except ValueError as err:
-        raise TelegramInitDataError("Invalid signature.", "invalid") from err
+        raise TelegramInitDataError(
+            "Invalid signature.",
+            "invalid",
+        ) from err
 
-    auth_date_str = pairs["auth_date"][0]
-    try:
-        auth_date = int(auth_date_str)
-    except (ValueError, TypeError) as err:
-        raise TelegramInitDataError("Invalid auth_date.", "malformed") from err
-
-    user_str = pairs["user"][0]
-    try:
-        user_data = json.loads(user_str)
-    except (json.JSONDecodeError, TypeError) as err:
-        raise TelegramInitDataError("Malformed user data.", "malformed") from err
-
-    if not isinstance(user_data, dict):
-        raise TelegramInitDataError("Malformed user data.", "malformed")
-
-    telegram_id = user_data.get("id")
-    if not isinstance(telegram_id, int):
-        raise TelegramInitDataError("Invalid user id.", "malformed")
-
-    if telegram_id < -(2**63) or telegram_id > 2**63 - 1:
-        raise TelegramInitDataError("Invalid user id.", "malformed")
-
-    now = _now if _now is not None else time.time()
-
-    if now - auth_date > max_age_seconds:
-        raise TelegramInitDataError("Init data expired.", "expired")
-
-    if auth_date > now + future_skew_seconds:
-        raise TelegramInitDataError("Init data from the future.", "expired")
-
+    # Step 5: Build data-check-string (exclude hash, sort by key)
     data_check_pairs = []
-    for key in sorted(pairs.keys()):
+    for key, value in raw_pairs:
         if key == "hash":
             continue
-        data_check_pairs.append(f"{key}={pairs[key][0]}")
+        data_check_pairs.append(f"{key}={value}")
     data_check_string = "\n".join(data_check_pairs)
 
+    # Step 6: HMAC-SHA-256 verification (BEFORE parsing user/auth_date)
     secret_key = hmac.new(
         key=b"WebAppData",
         msg=bot_token.encode("utf-8"),
@@ -120,12 +112,69 @@ def validate_telegram_init_data(
     ).hexdigest()
 
     if not hmac.compare_digest(calculated_hash, received_hash):
-        logger.info(
-            "event=telegram_init_data_validation result=invalid",
-        )
+        logger.info("event=telegram_init_data_validation result=invalid")
         raise TelegramInitDataError(
-            "Не удалось подтвердить данные Telegram.",  # noqa: RUF001
+            "Invalid signature.",
             "invalid",
+        )
+
+    # Step 7: ONLY AFTER successful HMAC — parse auth_date
+    try:
+        auth_date = int(pairs_dict["auth_date"])
+    except (ValueError, TypeError) as err:
+        logger.info("event=telegram_init_data_validation result=malformed")
+        raise TelegramInitDataError(
+            "Malformed init data.",
+            "malformed",
+        ) from err
+
+    # Step 8: Check auth_date freshness
+    now = _now if _now is not None else time.time()
+
+    if now - auth_date > max_age_seconds:
+        logger.info("event=telegram_init_data_validation result=expired")
+        raise TelegramInitDataError(
+            "Invalid signature.",
+            "expired",
+        )
+
+    if auth_date > now + future_skew_seconds:
+        logger.info("event=telegram_init_data_validation result=expired")
+        raise TelegramInitDataError(
+            "Invalid signature.",
+            "expired",
+        )
+
+    # Step 9: ONLY AFTER successful HMAC — parse user JSON
+    try:
+        user_data = json.loads(pairs_dict["user"])
+    except (json.JSONDecodeError, TypeError) as err:
+        logger.info("event=telegram_init_data_validation result=malformed")
+        raise TelegramInitDataError(
+            "Malformed init data.",
+            "malformed",
+        ) from err
+
+    if not isinstance(user_data, dict):
+        logger.info("event=telegram_init_data_validation result=malformed")
+        raise TelegramInitDataError(
+            "Malformed init data.",
+            "malformed",
+        )
+
+    telegram_id = user_data.get("id")
+    if not isinstance(telegram_id, int):
+        logger.info("event=telegram_init_data_validation result=malformed")
+        raise TelegramInitDataError(
+            "Malformed init data.",
+            "malformed",
+        )
+
+    if telegram_id < -(2**63) or telegram_id > 2**63 - 1:
+        logger.info("event=telegram_init_data_validation result=malformed")
+        raise TelegramInitDataError(
+            "Malformed init data.",
+            "malformed",
         )
 
     logger.info("event=telegram_init_data_validation result=success")
