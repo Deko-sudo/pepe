@@ -19,7 +19,7 @@ Telegram Mini App для рыночной аналитики криптовал�
 1. Technical foundation — completed and merged.
 2. Telegram Mini App `initData` validation — completed and merged.
 3. Telegram users persistence — completed and merged.
-4. Sessions and API authorization — planning; blocked pending contract approval; not implemented.
+4. Sessions and API authorization — implementation in progress in feature branch / PR; not merged.
 5. Asset catalog and market provider abstraction — not started.
 6. Current quotes — not started.
 7. Candles and historical data — not started.

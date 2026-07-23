@@ -21,16 +21,22 @@ def _origin_from_url(value: str) -> str | None:
     except ValueError:
         return None
 
+    hostname = parsed.hostname
     if (
         parsed.scheme not in {"http", "https"}
-        or not parsed.hostname
+        or hostname is None
         or parsed.username is not None
         or parsed.password is not None
     ):
         return None
 
     default_port = 80 if parsed.scheme == "http" else 443
-    authority = parsed.hostname if port in {None, default_port} else f"{parsed.hostname}:{port}"
+    authority_hostname = f"[{hostname}]" if ":" in hostname else hostname
+    authority = (
+        authority_hostname
+        if port in {None, default_port}
+        else f"{authority_hostname}:{port}"
+    )
     return f"{parsed.scheme}://{authority}"
 
 

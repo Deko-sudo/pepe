@@ -7,7 +7,7 @@ import pytest
 from fastapi import HTTPException
 from starlette.requests import Request
 
-from app.api.dependencies.csrf import require_session_csrf
+from app.api.dependencies.csrf import _origin_from_url, require_session_csrf
 from app.core.config import Settings
 from app.modules.sessions.service import (
     SESSION_TOKEN_BYTES,
@@ -70,12 +70,66 @@ def test_settings_rejects_production_without_allowed_session_origins() -> None:
         )
 
 
+@pytest.mark.parametrize("environment", ["production", "Production", "PRODUCTION", " production "])
+def test_settings_rejects_insecure_production_environment_variants(environment: str) -> None:
+    with pytest.raises(ValueError, match="session_cookie_secure"):
+        Settings(environment=environment, session_cookie_secure=False)
+
+
+def test_settings_accepts_secure_normalized_production_environment() -> None:
+    settings = Settings(
+        environment=" Production ",
+        session_cookie_secure=True,
+        session_allowed_origins="https://mini.pepe.example",
+    )
+
+    assert settings.environment == "production"
+    assert settings.session_origins == ("https://mini.pepe.example",)
+
+
+def test_settings_accepts_insecure_development_environment() -> None:
+    settings = Settings(environment="development", session_cookie_secure=False)
+
+    assert settings.environment == "development"
+
+
+@pytest.mark.parametrize("environment", ["Production", "PRODUCTION", " production "])
+def test_settings_rejects_empty_origins_for_normalized_production(environment: str) -> None:
+    with pytest.raises(ValueError, match="session_allowed_origins"):
+        Settings(
+            environment=environment,
+            session_cookie_secure=True,
+            session_allowed_origins="",
+        )
+
+
 def test_settings_rejects_wildcard_or_non_origin_session_origin() -> None:
     with pytest.raises(ValueError, match="absolute HTTP/HTTPS origins"):
         Settings(session_allowed_origins="https://*.example.com")
 
     with pytest.raises(ValueError, match="absolute HTTP/HTTPS origins"):
         Settings(session_allowed_origins="https://example.com/path")
+
+
+@pytest.mark.parametrize(
+    ("referer", "expected_origin"),
+    [
+        ("http://[::1]:3000/path", "http://[::1]:3000"),
+        ("http://[::1]/path", "http://[::1]"),
+        ("https://[2001:db8::1]:444/path", "https://[2001:db8::1]:444"),
+        ("https://mini.pepe.example/settings", "https://mini.pepe.example"),
+    ],
+)
+def test_origin_from_url_preserves_ipv6_brackets(
+    referer: str,
+    expected_origin: str,
+) -> None:
+    assert _origin_from_url(referer) == expected_origin
+
+
+@pytest.mark.parametrize("referer", ["http://[::1", "http://[::1]x/path"])
+def test_origin_from_url_rejects_malformed_ipv6(referer: str) -> None:
+    assert _origin_from_url(referer) is None
 
 
 @pytest.mark.asyncio
@@ -129,3 +183,20 @@ async def test_csrf_uses_allowed_referer_only_when_origin_is_absent() -> None:
     request = make_request({"referer": "https://mini.pepe.example/settings?tab=security"})
 
     await require_session_csrf(request, allowed_origins=("https://mini.pepe.example",))
+
+
+@pytest.mark.asyncio
+async def test_csrf_accepts_allowed_ipv6_referer() -> None:
+    request = make_request({"referer": "http://[::1]:3000/settings"})
+
+    await require_session_csrf(request, allowed_origins=("http://[::1]:3000",))
+
+
+@pytest.mark.asyncio
+async def test_csrf_rejects_ipv6_referer_with_different_port() -> None:
+    request = make_request({"referer": "http://[::1]:3001/settings"})
+
+    with pytest.raises(HTTPException) as exc_info:
+        await require_session_csrf(request, allowed_origins=("http://[::1]:3000",))
+
+    assert exc_info.value.status_code == 403

@@ -46,6 +46,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_session_settings(self) -> "Settings":
+        normalized_environment = self.environment.strip().lower()
+        self.environment = normalized_environment
         if not self.session_cookie_name:
             raise ValueError("session_cookie_name must not be empty")
         if self.session_absolute_ttl_seconds != 2_592_000:
