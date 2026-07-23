@@ -202,6 +202,24 @@ async def test_tampered_hash(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_tampered_fresh_auth_date(client: AsyncClient) -> None:
+    auth_date = int(time.time())
+    init_data = build_init_data(auth_date=auth_date)
+    tampered_init_data = init_data.replace(
+        f"auth_date={auth_date}",
+        f"auth_date={auth_date + 1}",
+    )
+
+    response = await client.post(
+        "/api/v1/auth/telegram/validate",
+        json={"init_data": tampered_init_data},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == GENERIC_ERROR
+
+
+@pytest.mark.asyncio
 async def test_wrong_bot_token(client: AsyncClient) -> None:
     init_data = build_init_data(bot_token="wrong_token")  # noqa: S106
     response = await client.post(
