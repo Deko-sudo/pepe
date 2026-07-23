@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from fastapi import APIRouter
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.schemas.auth import TelegramValidateRequest
+from app.db.session import get_db
+from app.modules.users.service import upsert_telegram_user
+from app.schemas.auth import TelegramValidateRequest, TelegramValidateResponse
 from app.services.telegram_init_data import (
     TelegramInitDataError,
     validate_telegram_init_data,
@@ -13,14 +15,13 @@ from app.services.telegram_init_data import (
 router = APIRouter()
 
 
-@router.post("/auth/telegram/validate")
-async def validate_telegram_init_data_endpoint(
+def validate_telegram_request(
     body: TelegramValidateRequest,
-) -> JSONResponse:
+) -> TelegramValidateResponse:
     if not settings.telegram_bot_token:
-        return JSONResponse(
+        raise HTTPException(
             status_code=503,
-            content={"detail": "Проверка Telegram временно недоступна."},
+            detail="Проверка Telegram временно недоступна.",
         )
 
     try:
@@ -32,15 +33,24 @@ async def validate_telegram_init_data_endpoint(
         )
     except TelegramInitDataError as e:
         if e.code == "unavailable":
-            return JSONResponse(
+            raise HTTPException(
                 status_code=503,
-                content={"detail": "Проверка Telegram временно недоступна."},
-            )
+                detail="Проверка Telegram временно недоступна.",
+            ) from e
 
-        # invalid, expired, malformed — all return the same generic message
-        return JSONResponse(
+        raise HTTPException(
             status_code=401,
-            content={"detail": "Не удалось подтвердить данные Telegram."},  # noqa: RUF001
-        )
+            detail="Не удалось подтвердить данные Telegram.",  # noqa: RUF001
+        ) from e
 
-    return JSONResponse(status_code=200, content=result)
+    return TelegramValidateResponse.model_validate(result)
+
+
+@router.post("/auth/telegram/validate", response_model=TelegramValidateResponse)
+async def validate_telegram_init_data_endpoint(
+    body: TelegramValidateRequest,
+    db: AsyncSession = Depends(get_db),
+) -> TelegramValidateResponse:
+    validation = validate_telegram_request(body)
+    await upsert_telegram_user(db, validation.user)
+    return validation

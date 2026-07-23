@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+import uuid
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict
 
 
 class TelegramValidateRequest(BaseModel):
@@ -22,3 +25,11 @@ class TelegramValidateResponse(BaseModel):
     status: str
     auth_date: int
     user: TelegramUser
+
+
+class UserProfile(TelegramUser):
+    id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

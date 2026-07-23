@@ -4,13 +4,13 @@ Telegram Mini App для рыночной аналитики криптовал�
 
 ## Статус
 
-**Этап 2** — Проверка Telegram Mini App initData.
+**Этап 3** — Telegram-пользователи.
 
 Статус: В разработке
 
 ## Границы этапа
 
-На этом этапе реализована серверная проверка Telegram initData. **Не реализовано**:
+На этом этапе реализованы серверная проверка Telegram initData и создание/обновление Telegram-пользователей. **Не реализовано**:
 
 - Авторизация пользователей (sessions, JWT, tokens)
 - Рыночные интеграции (Binance, OKX, CoinGecko, Gold API)
@@ -246,6 +246,7 @@ FastAPI сервис с эндпоинтами:
 - `GET /api/v1/ready` — Проверка зависимостей (200 OK / 503 Service Unavailable)
 - `GET /api/v1/version` — Информация о версии
 - `POST /api/v1/auth/telegram/validate` — Проверка Telegram initData
+- `POST /api/v1/users/me` — Профиль пользователя из проверенного Telegram initData
 
 ## Bot
 
@@ -295,7 +296,7 @@ docker compose exec redis redis-cli ping
 
 - Все данные на Dashboard являются демонстрационными
 - Нет реальных рыночных интеграций
-- Нет полноценной авторизации (только проверка initData)
+- Нет полноценной авторизации (профиль доступен только по повторно проверенному initData)
 - Нет сессий, JWT, refresh tokens
 
 ## Telegram initData Validation
@@ -320,9 +321,9 @@ TELEGRAM_INIT_DATA_FUTURE_SKEW_SECONDS=30
 
 При пустом `TELEGRAM_BOT_TOKEN` endpoint возвращает 503.
 
-## Следующий этап
+## Реализовано на текущем этапе
 
 - Таблица пользователей
 - Создание/обновление пользователя после проверки
-- Endpoint `/me`
+- Endpoint `POST /users/me`
 - Alembic migration
