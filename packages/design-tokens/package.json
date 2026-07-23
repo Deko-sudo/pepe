@@ -1,0 +1,7 @@
+{
+  "name": "@pepe/design-tokens",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Design tokens for Pepe",
+  "type": "module"
+}

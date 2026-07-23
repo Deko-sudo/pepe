@@ -1,0 +1,14 @@
+http://localhost {
+    handle /api/* {
+        reverse_proxy api:8000
+    }
+
+    handle {
+        reverse_proxy mini-app:80
+    }
+
+    log {
+        output stdout
+        format json
+    }
+}

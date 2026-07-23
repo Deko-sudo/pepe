@@ -1,31 +1,132 @@
-version: '3.8'
-
 services:
-  frontend:
+  mini-app:
+    container_name: pepe-mini-app
     build:
-      context: .
+      context: ./apps/mini-app
       dockerfile: Dockerfile
     ports:
-      - "3000:80"
-    depends_on:
-      - backend
+      - "${MINI_APP_PORT:-4000}:80"
     networks:
       - pepe-network
 
-  backend:
+  api:
+    container_name: pepe-api
     build:
-      context: ./server
+      context: ./apps/api
       dockerfile: Dockerfile
     ports:
-      - "3001:3001"
+      - "${API_EXT_PORT:-8100}:8000"
     environment:
-      - NODE_ENV=production
-      - PORT=3001
-    env_file:
-      - .env
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://pepe:change_me@postgres:5432/pepe}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - APP_ENV=${APP_ENV:-development}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - pepe-network
+
+  bot:
+    container_name: pepe-bot
+    build:
+      context: ./apps/bot
+      dockerfile: Dockerfile
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - MINI_APP_URL=${MINI_APP_URL:-http://localhost}
+    # Bot is either polling Telegram or idle-waiting for a token.
+    # No external ports are exposed; process liveness is the only
+    # observable signal that the container is operational.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; os.kill(1, 0)"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - pepe-network
+
+  worker:
+    container_name: pepe-worker
+    build:
+      context: ./apps/worker
+      dockerfile: Dockerfile
+    environment:
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "healthcheck.py"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - pepe-network
+
+  postgres:
+    container_name: pepe-postgres
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-pepe}
+      - POSTGRES_USER=${POSTGRES_USER:-pepe}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-change_me}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - pepe_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pepe} -d ${POSTGRES_DB:-pepe}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pepe-network
+
+  redis:
+    container_name: pepe-redis
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pepe-network
+
+  caddy:
+    container_name: pepe-caddy
+    image: caddy:2-alpine
+    ports:
+      - "${CADDY_PORT:-8080}:80"
+      - "443:443"
+    volumes:
+      - ./infrastructure/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - mini-app
+      - api
     networks:
       - pepe-network
 
 networks:
   pepe-network:
     driver: bridge
+
+volumes:
+  pepe_postgres_data:
+  caddy_data:
+  caddy_config:

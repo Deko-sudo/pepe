@@ -36,11 +36,23 @@ coverage/
 # Docker
 docker-compose.override.yml
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+*.egg
+.venv/
+venv/
+
 # TypeScript
 *.tsbuildinfo
 
 # Vite
 .vite/
+vite.config.js
+vite.config.d.ts
 
 # Misc
 *.pem

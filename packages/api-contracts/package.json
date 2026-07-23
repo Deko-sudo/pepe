@@ -1,0 +1,9 @@
+{
+  "name": "@pepe/api-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "API contracts for Pepe services",
+  "type": "module",
+  "main": "index.ts",
+  "types": "index.ts"
+}

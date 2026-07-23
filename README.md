@@ -1,158 +1,306 @@
 # Pepe
 
-Telegram Mini App for crypto and gold market analytics.
+Telegram Mini App для рыночной аналитики криптовалют и золота.
 
-## Features
+## Статус
 
-- Real-time cryptocurrency prices (BTC, ETH, etc.)
-- Gold price tracking
-- Technical indicators (RSI, MACD, Moving Averages)
-- Portfolio tracking
-- Price alerts and notifications
-- Dark mode support
+**Этап 1** — Технический фундамент.
 
-## Tech Stack
+Статус: В разработке
 
-### Frontend
-- React 18 with TypeScript
-- Vite for build tooling
-- Telegram Mini Apps SDK
-- Recharts for data visualization
-- Zustand for state management
-- Tailwind CSS for styling
+## Границы этапа
 
-### Backend
-- Node.js with Express
-- TypeScript
-- REST API
-- Rate limiting
-- Security best practices
+На этом этапе реализован только технический фундамент. **Не реализовано**:
 
-### DevOps
-- Docker & Docker Compose
-- GitHub Actions CI/CD
-- Nginx for frontend serving
-- Multi-stage builds
+- Telegram initData валидация
+- Авторизация пользователей
+- Рыночные интеграции (Binance, OKX, CoinGecko, Gold API)
+- Определение тренда и FVG
+- Торговая аналитика
+- Расписания и планировщики
+- Публикация аналитических сводок
+- AI API и чат
+- Платежи и заказы
+- Портфель и отслеживание активов
 
-## Getting Started
+## Стек
 
-### Prerequisites
+```mermaid
+graph TB
+    subgraph Frontend
+        MA[Mini App<br/>React 18 + TypeScript + Vite]
+    end
 
-- Node.js 20+
-- npm or yarn
-- Docker (optional)
-- Telegram Bot Token
+    subgraph Backend
+        API[API<br/>FastAPI + SQLAlchemy]
+        BOT[Bot<br/>aiogram 3]
+        WORKER[Worker<br/>Celery + Redis]
+    end
 
-### Installation
+    subgraph Data
+        PG[(PostgreSQL)]
+        RD[(Redis)]
+    end
 
-1. Clone the repository:
+    subgraph Infrastructure
+        CADDY[Caddy]
+        DC[Docker Compose]
+    end
+
+    MA --> CADDY
+    CADDY --> API
+    API --> PG
+    API --> RD
+    BOT --> RD
+    WORKER --> RD
+```
+
+## Требования
+
+- Docker и Docker Compose
+- Node.js 20+ (для локальной разработки)
+- Python 3.12+ (для локальной разработки)
+
+## Настройка
+
+1. Клонируйте репозиторий:
+
 ```bash
 git clone https://github.com/Deko-sudo/pepe.git
 cd pepe
 ```
 
-2. Install frontend dependencies:
-```bash
-npm install
-```
+2. Скопируйте переменные окружения:
 
-3. Install backend dependencies:
-```bash
-cd server
-npm install
-cd ..
-```
-
-4. Copy environment variables:
 ```bash
 cp .env.example .env
 ```
 
-5. Fill in your environment variables in `.env`
+3. Отредактируйте `.env` при необходимости.
 
-### Development
+### Порты
 
-Start frontend development server:
+Все внешние порты параметризуются через переменные окружения в `.env`:
+
+| Переменная | По умолчанию | Описание |
+|---|---|---|
+| `MINI_APP_PORT` | `4000` | Mini App (Nginx) |
+| `API_EXT_PORT` | `8100` | FastAPI |
+| `POSTGRES_PORT` | `5433` | PostgreSQL |
+| `REDIS_PORT` | `6380` | Redis |
+| `CADDY_PORT` | `8080` | Caddy reverse proxy |
+
+## Запуск
+
+### Docker Compose (рекомендуется)
+
 ```bash
+make up
+```
+
+Или:
+
+```bash
+docker compose up -d
+```
+
+### Локальная разработка
+
+#### Frontend
+
+```bash
+cd apps/mini-app
+npm install
 npm run dev
 ```
 
-Start backend development server:
+#### Backend API
+
 ```bash
-cd server
-npm run dev
+cd apps/api
+pip install -e ".[dev]"
+uvicorn app.main:app --reload
 ```
 
-### Building
+#### Bot
 
-Build frontend:
 ```bash
-npm run build
+cd apps/bot
+pip install -e ".[dev]"
+python -m app.main
 ```
 
-Build backend:
+#### Worker
+
 ```bash
-cd server
-npm run build
+cd apps/worker
+pip install -e ".[dev]"
+celery -A app.celery_app worker
 ```
 
-### Docker
+## Makefile
 
-Build and run with Docker Compose:
 ```bash
-docker compose up --build
+make help       # Показать доступные команды
+make up         # Запустить все сервисы
+make down       # Остановить все сервисы
+make build      # Собрать все образы
+make test       # Запустить все тесты
+make lint       # Запустить линтеры
+make typecheck  # Запустить проверку типов
+make migrate    # Применить миграции
 ```
 
-The app will be available at:
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:3001
+## Локальные URL
 
-## Project Structure
+| Сервис | URL |
+|---|---|
+| Mini App | http://localhost:${MINI_APP_PORT:-4000} |
+| API | http://localhost:${API_EXT_PORT:-8100} |
+| API Docs | http://localhost:${API_EXT_PORT:-8100}/docs |
+| PostgreSQL | localhost:${POSTGRES_PORT:-5433} |
+| Redis | localhost:${REDIS_PORT:-6380} |
+| Caddy | http://localhost:${CADDY_PORT:-8080} |
+
+## Миграции
+
+```bash
+make migrate
+```
+
+Или вручную:
+
+```bash
+cd apps/api
+alembic upgrade head
+```
+
+## Тесты
+
+```bash
+make test
+```
+
+Или по сервисам:
+
+```bash
+# Frontend
+cd apps/mini-app && npm test
+
+# API
+cd apps/api && pytest
+
+# Bot
+cd apps/bot && pytest
+
+# Worker
+cd apps/worker && pytest
+```
+
+## Структура монорепозитория
 
 ```
 pepe/
-├── src/                    # Frontend source code
-│   ├── components/         # Reusable UI components
-│   ├── pages/              # Page components
-│   ├── hooks/              # Custom React hooks
-│   ├── services/           # API services
-│   ├── store/              # State management
-│   ├── styles/             # CSS styles
-│   ├── types/              # TypeScript types
-│   └── utils/              # Utility functions
-├── server/                 # Backend API
-│   ├── src/
-│   │   ├── config/         # Configuration
-│   │   ├── controllers/    # Request handlers
-│   │   ├── middleware/      # Express middleware
-│   │   └── routes/         # API routes
-│   └── package.json
-├── .github/workflows/      # CI/CD pipeline
-├── docker-compose.yml      # Docker configuration
-└── README.md
+├── apps/
+│   ├── mini-app/      # Telegram Mini App (React)
+│   ├── api/           # Backend API (FastAPI)
+│   ├── bot/           # Telegram Bot (aiogram)
+│   └── worker/        # Background Worker (Celery)
+├── packages/
+│   ├── api-contracts/ # API контракты
+│   ├── design-tokens/ # Дизайн-токены
+│   └── shared-config/ # Общая конфигурация
+├── infrastructure/
+│   ├── caddy/         # Caddy конфигурация
+│   ├── docker/        # Docker файлы
+│   └── cloudflare/    # Cloudflare документация
+├── docs/
+│   ├── architecture/  # Архитектурные решения
+│   ├── product/       # Продуктовая документация
+│   ├── security/      # Безопасность
+│   └── trading/       # Торговая логика
+├── scripts/           # Утилиты
+├── tests/             # Интеграционные тесты
+├── .github/workflows/ # CI/CD
+├── .env.example       # Пример переменных
+├── docker-compose.yml # Docker Compose
+├── Makefile           # Команды
+└── README.md          # Документация
 ```
 
-## API Endpoints
+## Mini App
 
-- `GET /api/health` - Health check
-- `GET /api/market/prices` - Get current prices
-- `GET /api/market/history/:assetId` - Get price history
-- `GET /api/market/analytics/:assetId` - Get analytics data
+Telegram Mini App с страницами:
 
-## Contributing
+- `/` — Dashboard
+- `/markets` — Рынки
+- `/reports` — Сводки
+- `/settings` — Настройки
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+Дизайн: тёмный AI/Web3 интерфейс с фиолетово-голубыми градиентами.
 
-## License
+## API
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+FastAPI сервис с эндпоинтами:
 
-## Acknowledgments
+- `GET /api/v1/health` — Проверка здоровья
+- `GET /api/v1/ready` — Проверка зависимостей (200 OK / 503 Service Unavailable)
+- `GET /api/v1/version` — Информация о версии
 
-- [Telegram Mini Apps SDK](https://core.telegram.org/bots/webapps)
-- [Recharts](https://recharts.org/)
-- [Zustand](https://zustand-demo.pmnd.rs/)
+## Bot
+
+Telegram бот с командами:
+
+- `/start` — Запуск приложения
+- `/help` — Справка
+
+## Worker
+
+Celery воркер с задачами:
+
+- `heartbeat` — Проверка работоспособности
+- `test_task` — Тестовая задача
+
+## Cloudflare
+
+Документация по деплою через Cloudflare: `infrastructure/cloudflare/README.md`
+
+## Troubleshooting
+
+### Контейнер не запускается
+
+Проверьте логи:
+
+```bash
+docker compose logs <service>
+```
+
+### PostgreSQL не доступен
+
+Убедитесь, что PostgreSQL запущен и здоров:
+
+```bash
+docker compose ps postgres
+```
+
+### Redis не доступен
+
+Проверьте подключение:
+
+```bash
+docker compose exec redis redis-cli ping
+```
+
+## Ограничения
+
+- Все данные на Dashboard являются демонстрационными
+- Нет реальных рыночных интеграций
+- Нет авторизации пользователей
+- Нет валидации Telegram initData
+
+## Следующий этап
+
+- Telegram initData аутентификация
+- HMAC-SHA256 валидация
+- Сессии пользователей
+- Начальные бизнес-сущности базы данных
