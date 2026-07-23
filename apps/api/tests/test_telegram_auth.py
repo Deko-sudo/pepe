@@ -5,14 +5,15 @@ import hmac
 import json
 import logging
 import time
-from collections.abc import AsyncGenerator
-from unittest.mock import patch
+from collections.abc import AsyncGenerator, AsyncIterator
+from unittest.mock import AsyncMock, patch
 from urllib.parse import urlencode
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.core.config import settings
+from app.db.session import get_db
 from app.main import app
 
 BOT_TOKEN = "1234567890:ABCdefGHIjklMNOpqrsTUVwxyz"  # noqa: S105
@@ -90,10 +91,19 @@ STATIC_INIT_DATA = (
 
 @pytest.fixture
 async def client() -> AsyncGenerator[AsyncClient, None]:
+    db = AsyncMock()
+
+    async def override_db() -> AsyncIterator[AsyncMock]:
+        yield db
+
+    app.dependency_overrides[get_db] = override_db
     with patch.object(settings, "telegram_bot_token", BOT_TOKEN):
-        transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as ac:
-            yield ac
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as ac:
+                yield ac
+        finally:
+            app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio

@@ -46,10 +46,10 @@ typecheck: ## Run type checkers
 	cd apps/worker && .venv/bin/mypy .
 
 migrate: ## Run database migrations
-	cd apps/api && alembic upgrade head
+	cd apps/api && .venv/bin/alembic upgrade head
 
 migration: ## Create new migration
-	cd apps/api && alembic revision --autogenerate -m "$(msg)"
+	cd apps/api && .venv/bin/alembic revision --autogenerate -m "$(msg)"
 
 shell-api: ## Open API shell
 	docker compose exec api bash
