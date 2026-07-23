@@ -51,6 +51,8 @@ venv/
 
 # Vite
 .vite/
+vite.config.js
+vite.config.d.ts
 
 # Misc
 *.pem

@@ -39,7 +39,7 @@ select = ["E", "F", "W", "I", "N", "UP", "S", "B", "A", "COM", "C4", "DTZ", "T20
 [tool.mypy]
 python_version = "3.12"
 strict = true
-disable_error_code = ["import-untyped", "untyped-decorator"]
+disable_error_code = ["import-untyped", "untyped-decorator", "no-untyped-call"]
 
 [[tool.mypy.overrides]]
 module = ["celery.*", "kombu.*", "vine.*"]

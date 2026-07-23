@@ -42,6 +42,9 @@ services:
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
       - MINI_APP_URL=${MINI_APP_URL:-http://localhost}
+    # Bot is either polling Telegram or idle-waiting for a token.
+    # No external ports are exposed; process liveness is the only
+    # observable signal that the container is operational.
     healthcheck:
       test: ["CMD", "python", "-c", "import os; os.kill(1, 0)"]
       interval: 10s
@@ -63,7 +66,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import os; os.kill(1, 0)"]
+      test: ["CMD", "python", "healthcheck.py"]
       interval: 10s
       timeout: 5s
       retries: 3

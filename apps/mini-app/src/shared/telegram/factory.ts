@@ -23,7 +23,8 @@ declare global {
           offClick(callback: () => void): void;
         };
         HapticFeedback: {
-          impactOccurred(type: "light" | "medium" | "success" | "error"): void;
+          impactOccurred(type: "light" | "medium"): void;
+          notificationOccurred(type: "success" | "error"): void;
         };
         showAlert(message: string, callback?: () => void): void;
       };
@@ -97,7 +98,11 @@ class TelegramWebAppBridge implements TelegramBridge {
 
   haptic(type: "light" | "medium" | "success" | "error"): void {
     try {
-      getWebApp().HapticFeedback.impactOccurred(type);
+      if (type === "light" || type === "medium") {
+        getWebApp().HapticFeedback.impactOccurred(type);
+      } else {
+        getWebApp().HapticFeedback.notificationOccurred(type);
+      }
     } catch {
       // Silent fail
     }

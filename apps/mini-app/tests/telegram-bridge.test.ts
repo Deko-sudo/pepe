@@ -16,6 +16,7 @@ interface MockWebApp {
   };
   HapticFeedback: {
     impactOccurred: ReturnType<typeof vi.fn>;
+    notificationOccurred: ReturnType<typeof vi.fn>;
   };
   showAlert: ReturnType<typeof vi.fn>;
 }
@@ -35,6 +36,7 @@ function createMockWebApp(overrides?: Partial<MockWebApp>): MockWebApp {
     },
     HapticFeedback: {
       impactOccurred: vi.fn(),
+      notificationOccurred: vi.fn(),
     },
     showAlert: vi.fn(),
     ...overrides,
@@ -228,13 +230,26 @@ describe("TelegramWebAppBridge (real Telegram SDK mock)", () => {
     expect(mock.BackButton.offClick).toHaveBeenCalledWith(cb);
   });
 
-  it("calls HapticFeedback.impactOccurred", async () => {
+  it("calls HapticFeedback.impactOccurred for light/medium", async () => {
     const { createTelegramBridge } = await import(
       "../src/shared/telegram/factory"
     );
     const bridge = createTelegramBridge();
+    bridge.haptic("light");
+    expect(mock.HapticFeedback.impactOccurred).toHaveBeenCalledWith("light");
     bridge.haptic("medium");
     expect(mock.HapticFeedback.impactOccurred).toHaveBeenCalledWith("medium");
+  });
+
+  it("calls HapticFeedback.notificationOccurred for success/error", async () => {
+    const { createTelegramBridge } = await import(
+      "../src/shared/telegram/factory"
+    );
+    const bridge = createTelegramBridge();
+    bridge.haptic("success");
+    expect(mock.HapticFeedback.notificationOccurred).toHaveBeenCalledWith("success");
+    bridge.haptic("error");
+    expect(mock.HapticFeedback.notificationOccurred).toHaveBeenCalledWith("error");
   });
 
   it("calls showAlert", async () => {
