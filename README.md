@@ -4,16 +4,15 @@ Telegram Mini App для рыночной аналитики криптовал�
 
 ## Статус
 
-**Этап 1** — Технический фундамент.
+**Этап 2** — Проверка Telegram Mini App initData.
 
 Статус: В разработке
 
 ## Границы этапа
 
-На этом этапе реализован только технический фундамент. **Не реализовано**:
+На этом этапе реализована серверная проверка Telegram initData. **Не реализовано**:
 
-- Telegram initData валидация
-- Авторизация пользователей
+- Авторизация пользователей (sessions, JWT, tokens)
 - Рыночные интеграции (Binance, OKX, CoinGecko, Gold API)
 - Определение тренда и FVG
 - Торговая аналитика
@@ -246,6 +245,7 @@ FastAPI сервис с эндпоинтами:
 - `GET /api/v1/health` — Проверка здоровья
 - `GET /api/v1/ready` — Проверка зависимостей (200 OK / 503 Service Unavailable)
 - `GET /api/v1/version` — Информация о версии
+- `POST /api/v1/auth/telegram/validate` — Проверка Telegram initData
 
 ## Bot
 
@@ -295,12 +295,34 @@ docker compose exec redis redis-cli ping
 
 - Все данные на Dashboard являются демонстрационными
 - Нет реальных рыночных интеграций
-- Нет авторизации пользователей
-- Нет валидации Telegram initData
+- Нет полноценной авторизации (только проверка initData)
+- Нет сессий, JWT, refresh tokens
+
+## Telegram initData Validation
+
+Backend проверяет подлинность `Telegram.WebApp.initData` через HMAC-SHA-256:
+
+1. Фронтенд получает `initData` из Telegram WebView
+2. Отправляет строку на `POST /api/v1/auth/telegram/validate`
+3. Backend вычисляет HMAC-SHA-256 и сравнивает с полученным hash
+4. Проверяет срок действия `auth_date` (по умолчанию 1 час)
+5. Возвращает нормализованные данные пользователя
+
+**Важно:** `initDataUnsafe` не используется как доверенный источник.
+
+### Environment Variables
+
+```
+TELEGRAM_BOT_TOKEN=           # Токен бота (обязателен для проверки)
+TELEGRAM_INIT_DATA_MAX_AGE_SECONDS=3600
+TELEGRAM_INIT_DATA_FUTURE_SKEW_SECONDS=30
+```
+
+При пустом `TELEGRAM_BOT_TOKEN` endpoint возвращает 503.
 
 ## Следующий этап
 
-- Telegram initData аутентификация
-- HMAC-SHA256 валидация
-- Сессии пользователей
-- Начальные бизнес-сущности базы данных
+- Таблица пользователей
+- Создание/обновление пользователя после проверки
+- Endpoint `/me`
+- Alembic migration
