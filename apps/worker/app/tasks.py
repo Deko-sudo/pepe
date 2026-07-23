@@ -16,7 +16,7 @@ def heartbeat() -> dict[str, str]:
 
 
 @celery_app.task(name="test_task")
-def test_task(value: str = "test") -> dict[str, str]:
+def run_test_task(value: str = "test") -> dict[str, str]:
     logger.info("Test task executed with value: %s", value)
     return {
         "service": "pepe-worker",

@@ -1,5 +1,5 @@
 from app.config import worker_settings
-from app.tasks import heartbeat, test_task
+from app.tasks import heartbeat, run_test_task
 
 
 def test_heartbeat_returns_ok() -> None:
@@ -10,7 +10,7 @@ def test_heartbeat_returns_ok() -> None:
 
 
 def test_test_task_returns_ok() -> None:
-    result = test_task("hello")
+    result = run_test_task("hello")
     assert result["service"] == "pepe-worker"
     assert result["event"] == "test"
     assert result["status"] == "ok"
