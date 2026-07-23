@@ -4,11 +4,45 @@ Telegram Mini App для рыночной аналитики криптовал�
 
 ## Статус
 
-**Этап 3** — Telegram-пользователи.
+**Этап 1 — Technical foundation** — completed and merged.
 
-Статус: В разработке
+**Этап 2 — Telegram Mini App `initData` validation** — completed and merged.
 
-## Границы этапа
+**Этап 3 — Telegram users persistence** — completed and merged.
+
+**Этап 4 — Sessions and API authorization** — planning, blocked pending contract approval. Not implemented.
+
+**Прогресс:** completed 3/12, remaining 9/12, progress by stages 25%.
+
+## Дорожная карта
+
+1. Technical foundation — completed and merged.
+2. Telegram Mini App `initData` validation — completed and merged.
+3. Telegram users persistence — completed and merged.
+4. Sessions and API authorization — planning; blocked pending contract approval; not implemented.
+5. Asset catalog and market provider abstraction — not started.
+6. Current quotes — not started.
+7. Candles and historical data — not started.
+8. Real market UI — not started.
+9. Analytics core — not started.
+10. Reports and publishing — not started.
+11. AI Support and notifications — not started.
+12. Production hardening and launch — not started.
+
+Официальный proposed Stage 4 document: [docs/architecture/stage-4-sessions-api-authorization.md](docs/architecture/stage-4-sessions-api-authorization.md). Реализация запрещена до явного утверждения контракта пользователем.
+
+## Контекст будущих этапов (не реализовано)
+
+- **Stage 5:** asset catalog; BTC, ETH, XAU/USD; provider abstraction; разные правила ликвидности для crypto, metals, indices и yields.
+- **Stage 6:** current quotes; cache; timestamps; stale handling; provider failover.
+- **Stage 7:** OHLCV и historical candles с достаточным indicator warm-up: D1 — 250, H4 — 300, H1 — 300, M15 — 200.
+- **Stage 8:** real market UI с реальными данными и состояниями loading, stale, unavailable, error.
+- **Stage 9:** Swing High / Swing Low, EMA, ATR, RSI, volume, FVG, sessions, BTC context, Trend Score и матрица триады. До реализации требуется формализовать Trend Score/веса/пороги, матрицу триады, FVG formulas/mitigation, session timezone/DST; BTC context применим только к crypto, а XAU/USD, indices и yields требуют отдельной логики.
+- **Stage 10:** reports, publishing, history и безопасный аналитический язык.
+- **Stage 11:** AI explanation, notifications, preferences, rate limits и отсутствие финансовых обещаний.
+- **Stage 12:** security hardening, observability, backups, production migrations, secrets management, performance, rate limiting, deployment и launch checklist.
+
+## Реализованная граница Этапа 3
 
 На этом этапе реализованы серверная проверка Telegram initData и создание/обновление Telegram-пользователей. **Не реализовано**:
 
@@ -321,7 +355,7 @@ TELEGRAM_INIT_DATA_FUTURE_SKEW_SECONDS=30
 
 При пустом `TELEGRAM_BOT_TOKEN` endpoint возвращает 503.
 
-## Реализовано на текущем этапе
+## Реализовано на Этапе 3
 
 - Таблица пользователей
 - Создание/обновление пользователя после проверки
