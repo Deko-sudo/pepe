@@ -1,3 +1,4 @@
 export type { TelegramBridge } from "./types";
-export { TelegramProvider, useTelegram } from "./provider";
+export { TelegramProvider } from "./provider";
+export { useTelegram } from "./context";
 export { createTelegramBridge } from "./factory";
