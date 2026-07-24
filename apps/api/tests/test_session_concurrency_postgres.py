@@ -4,6 +4,7 @@ import asyncio
 import os
 import uuid
 from collections.abc import AsyncIterator
+from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -14,6 +15,7 @@ from app.db.models.user import User
 from app.db.models.user_session import UserSession
 from app.modules.sessions.service import (
     create_session,
+    digest_session_token,
     is_active_session,
     resolve_authenticated_session,
     revoke_all_active_sessions,
@@ -141,6 +143,52 @@ async def test_logout_all_waits_for_create_session_user_lock(
             await asyncio.wait_for(creation_task, timeout=2)
         if not logout_task.done():
             await asyncio.wait_for(logout_task, timeout=2)
+        await delete_test_user(postgres_sessions, user_id)
+
+
+@pytest.mark.asyncio
+async def test_authenticated_session_locks_user_before_presented_session(
+    postgres_sessions: async_sessionmaker[AsyncSession],
+) -> None:
+    user_id = await create_test_user(postgres_sessions)
+    now = datetime.now(UTC)
+    _, token = await create_committed_session(postgres_sessions, user_id, now=now)
+    resolution_task: asyncio.Task[None] | None = None
+
+    try:
+        async with postgres_sessions() as locking_db:
+            await locking_db.execute(select(User.id).where(User.id == user_id).with_for_update())
+
+            async def resolve_while_user_is_locked() -> None:
+                async with postgres_sessions() as db:
+                    authenticated = await resolve_authenticated_session(
+                        db,
+                        token,
+                        idle_ttl_seconds=604_800,
+                        now=now + timedelta(seconds=1),
+                    )
+                    assert authenticated is not None
+                    await db.commit()
+
+            resolution_task = asyncio.create_task(resolve_while_user_is_locked())
+            with pytest.raises(TimeoutError):
+                await asyncio.wait_for(asyncio.shield(resolution_task), timeout=0.2)
+
+            async with postgres_sessions() as probe_db:
+                await probe_db.execute(
+                    select(UserSession.id)
+                    .where(UserSession.token_digest == digest_session_token(token))
+                    .with_for_update(nowait=True),
+                )
+
+            await locking_db.commit()
+
+        await asyncio.wait_for(resolution_task, timeout=2)
+    finally:
+        if resolution_task is not None and not resolution_task.done():
+            resolution_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await resolution_task
         await delete_test_user(postgres_sessions, user_id)
 
 

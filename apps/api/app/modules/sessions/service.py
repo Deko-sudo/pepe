@@ -138,9 +138,15 @@ async def resolve_authenticated_session(
 ) -> AuthenticatedSession | None:
     if not token:
         return None
+    session = await get_active_session_by_token(db, token, now=now)
+    if session is None:
+        return None
+
+    await db.execute(select(User.id).where(User.id == session.user_id).with_for_update())
     session = await get_active_session_by_token(db, token, now=now, lock_for_update=True)
     if session is None:
         return None
+
     user = await db.get(User, session.user_id)
     if user is None:
         return None
