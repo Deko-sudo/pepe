@@ -2,8 +2,11 @@ x-api-build: &api-build
   context: ./apps/api
   dockerfile: Dockerfile
 
-x-api-environment: &api-environment
+x-migrate-environment: &migrate-environment
   DATABASE_URL: "${DATABASE_URL:-postgresql+asyncpg://pepe:change_me@postgres:5432/pepe}"
+
+x-api-environment: &api-environment
+  <<: *migrate-environment
   REDIS_URL: "${REDIS_URL:-redis://redis:6379/0}"
   APP_ENV: "${APP_ENV:-development}"
   TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN:-}"
@@ -58,7 +61,7 @@ services:
     build: *api-build
     command: ["alembic", "upgrade", "head"]
     restart: "no"
-    environment: *api-environment
+    environment: *migrate-environment
     depends_on:
       postgres:
         condition: service_healthy

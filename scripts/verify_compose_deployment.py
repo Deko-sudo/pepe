@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-SESSION_ENVIRONMENT_KEYS = (
+API_ENVIRONMENT_KEYS = (
     "APP_ENV",
     "DATABASE_URL",
     "SESSION_COOKIE_NAME",
@@ -21,6 +21,7 @@ SESSION_ENVIRONMENT_KEYS = (
     "SESSION_COOKIE_SECURE",
     "SESSION_ALLOWED_ORIGINS",
 )
+MIGRATE_ENVIRONMENT_KEYS = ("DATABASE_URL",)
 CUSTOM_ENVIRONMENT = {
     "APP_ENV": "production",
     "DATABASE_URL": "postgresql+asyncpg://custom:custom@postgres:5432/custom",
@@ -85,11 +86,14 @@ def assert_migration_contract(rendered: dict[str, Any], expected_environment: di
 
     api_environment = environment_mapping(api)
     migrate_environment = environment_mapping(migrate)
-    for key in SESSION_ENVIRONMENT_KEYS:
-        if api_environment.get(key) != migrate_environment.get(key):
-            raise AssertionError(f"api and migrate must have matching {key}")
+    if set(migrate_environment) != set(MIGRATE_ENVIRONMENT_KEYS):
+        raise AssertionError("migrate must receive only DATABASE_URL")
+    for key in API_ENVIRONMENT_KEYS:
         if api_environment.get(key) != expected_environment[key]:
             raise AssertionError(f"rendered {key} did not match the expected value")
+    for key in MIGRATE_ENVIRONMENT_KEYS:
+        if migrate_environment.get(key) != expected_environment[key]:
+            raise AssertionError(f"rendered migrate {key} did not match the expected value")
 
 
 def main() -> int:

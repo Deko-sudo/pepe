@@ -138,9 +138,9 @@ async def test_logout_all_waits_for_create_session_user_lock(
     finally:
         allow_creation_commit.set()
         if not creation_task.done():
-            await creation_task
+            await asyncio.wait_for(creation_task, timeout=2)
         if not logout_task.done():
-            await logout_task
+            await asyncio.wait_for(logout_task, timeout=2)
         await delete_test_user(postgres_sessions, user_id)
 
 
