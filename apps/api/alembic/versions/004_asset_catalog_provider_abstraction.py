@@ -214,8 +214,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute("DELETE FROM provider_instrument_mappings")
-    op.execute("DELETE FROM asset_instruments")
     op.drop_index("uq_provider_mapping_enabled_priority", table_name="provider_instrument_mappings")
     op.drop_index("ix_provider_mapping_provider_lookup", table_name="provider_instrument_mappings")
     op.drop_index("ix_provider_mapping_instrument_id", table_name="provider_instrument_mappings")
