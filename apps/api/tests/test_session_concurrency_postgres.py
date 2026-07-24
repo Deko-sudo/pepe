@@ -264,6 +264,73 @@ async def test_authenticated_session_revalidates_after_concurrent_logout(
 
 
 @pytest.mark.asyncio
+async def test_rotation_locks_user_before_flushing_presented_session_revocation(
+    postgres_sessions: async_sessionmaker[AsyncSession],
+) -> None:
+    user_id = await create_test_user(postgres_sessions)
+    now = datetime.now(UTC)
+    _, token = await create_committed_session(postgres_sessions, user_id, now=now)
+    rotation_user_lock_attempted = asyncio.Event()
+    rotation_task: asyncio.Task[None] | None = None
+    engine = postgres_sessions.kw["bind"]
+    assert isinstance(engine, AsyncEngine)
+    loop = asyncio.get_running_loop()
+
+    def record_rotation_user_lock_attempt(
+        _connection: object,
+        _cursor: object,
+        statement: str,
+        _parameters: object,
+        _context: object,
+        _executemany: object,
+    ) -> None:
+        if "FROM users" in statement and "FOR UPDATE" in statement:
+            loop.call_soon_threadsafe(rotation_user_lock_attempted.set)
+
+    try:
+        async with postgres_sessions() as locking_db:
+            await locking_db.execute(select(User.id).where(User.id == user_id).with_for_update())
+            event.listen(
+                engine.sync_engine,
+                "before_cursor_execute",
+                record_rotation_user_lock_attempt,
+            )
+
+            async def rotate_session() -> None:
+                async with postgres_sessions() as db:
+                    user = await db.get(User, user_id)
+                    assert user is not None
+                    await revoke_presented_session(db, token, now=now)
+                    await create_session(
+                        db,
+                        user,
+                        absolute_ttl_seconds=2_592_000,
+                        idle_ttl_seconds=604_800,
+                        max_active_sessions=5,
+                        now=now,
+                    )
+                    await db.commit()
+
+            rotation_task = asyncio.create_task(rotate_session())
+            await asyncio.wait_for(rotation_user_lock_attempted.wait(), timeout=2)
+            await locking_db.execute(
+                select(UserSession.id)
+                .where(UserSession.token_digest == digest_session_token(token))
+                .with_for_update(nowait=True),
+            )
+            await locking_db.commit()
+
+        await asyncio.wait_for(rotation_task, timeout=2)
+    finally:
+        event.remove(engine.sync_engine, "before_cursor_execute", record_rotation_user_lock_attempt)
+        if rotation_task is not None and not rotation_task.done():
+            rotation_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await rotation_task
+        await delete_test_user(postgres_sessions, user_id)
+
+
+@pytest.mark.asyncio
 async def test_idle_refresh_is_monotonic_when_earlier_request_commits_after_later_request(
     postgres_sessions: async_sessionmaker[AsyncSession],
 ) -> None:

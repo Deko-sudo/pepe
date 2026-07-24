@@ -82,7 +82,8 @@ async def create_session(
     max_active_sessions: int,
     now: datetime,
 ) -> tuple[UserSession, str]:
-    await db.execute(select(User.id).where(User.id == user.id).with_for_update())
+    with db.no_autoflush:
+        await db.execute(select(User.id).where(User.id == user.id).with_for_update())
     active_statement = (
         select(UserSession)
         .where(
