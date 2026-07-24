@@ -145,12 +145,14 @@ async def test_logout_all_waits_for_create_session_user_lock(
             now=now + timedelta(seconds=1),
         )
     finally:
-        allow_creation_commit.set()
-        if not creation_task.done():
-            await asyncio.wait_for(creation_task, timeout=2)
-        if not logout_task.done():
-            await asyncio.wait_for(logout_task, timeout=2)
-        await delete_test_user(postgres_sessions, user_id)
+        try:
+            allow_creation_commit.set()
+            if not creation_task.done():
+                await asyncio.wait_for(creation_task, timeout=2)
+            if not logout_task.done():
+                await asyncio.wait_for(logout_task, timeout=2)
+        finally:
+            await delete_test_user(postgres_sessions, user_id)
 
 
 @pytest.mark.asyncio
@@ -192,11 +194,13 @@ async def test_authenticated_session_locks_user_before_presented_session(
 
         await asyncio.wait_for(resolution_task, timeout=2)
     finally:
-        if resolution_task is not None and not resolution_task.done():
-            resolution_task.cancel()
-            with suppress(asyncio.CancelledError):
-                await resolution_task
-        await delete_test_user(postgres_sessions, user_id)
+        try:
+            if resolution_task is not None and not resolution_task.done():
+                resolution_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await resolution_task
+        finally:
+            await delete_test_user(postgres_sessions, user_id)
 
 
 @pytest.mark.asyncio
@@ -255,12 +259,14 @@ async def test_authenticated_session_revalidates_after_concurrent_logout(
         await asyncio.wait_for(resolver_task, timeout=2)
         assert resolution_result == [None]
     finally:
-        event.remove(engine.sync_engine, "after_cursor_execute", record_initial_session_lookup)
-        if resolver_task is not None and not resolver_task.done():
-            resolver_task.cancel()
-            with suppress(asyncio.CancelledError):
-                await resolver_task
-        await delete_test_user(postgres_sessions, user_id)
+        try:
+            event.remove(engine.sync_engine, "after_cursor_execute", record_initial_session_lookup)
+            if resolver_task is not None and not resolver_task.done():
+                resolver_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await resolver_task
+        finally:
+            await delete_test_user(postgres_sessions, user_id)
 
 
 @pytest.mark.asyncio
@@ -272,6 +278,7 @@ async def test_rotation_locks_user_before_flushing_presented_session_revocation(
     _, token = await create_committed_session(postgres_sessions, user_id, now=now)
     rotation_user_lock_attempted = asyncio.Event()
     rotation_task: asyncio.Task[None] | None = None
+    rotation_listener_registered = False
     engine = postgres_sessions.kw["bind"]
     assert isinstance(engine, AsyncEngine)
     loop = asyncio.get_running_loop()
@@ -295,6 +302,7 @@ async def test_rotation_locks_user_before_flushing_presented_session_revocation(
                 "before_cursor_execute",
                 record_rotation_user_lock_attempt,
             )
+            rotation_listener_registered = True
 
             async def rotate_session() -> None:
                 async with postgres_sessions() as db:
@@ -322,12 +330,19 @@ async def test_rotation_locks_user_before_flushing_presented_session_revocation(
 
         await asyncio.wait_for(rotation_task, timeout=2)
     finally:
-        event.remove(engine.sync_engine, "before_cursor_execute", record_rotation_user_lock_attempt)
-        if rotation_task is not None and not rotation_task.done():
-            rotation_task.cancel()
-            with suppress(asyncio.CancelledError):
-                await rotation_task
-        await delete_test_user(postgres_sessions, user_id)
+        try:
+            if rotation_listener_registered:
+                event.remove(
+                    engine.sync_engine,
+                    "before_cursor_execute",
+                    record_rotation_user_lock_attempt,
+                )
+            if rotation_task is not None and not rotation_task.done():
+                rotation_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await rotation_task
+        finally:
+            await delete_test_user(postgres_sessions, user_id)
 
 
 @pytest.mark.asyncio
