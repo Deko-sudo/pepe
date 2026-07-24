@@ -62,4 +62,26 @@ describe("session API client", () => {
       status: 403,
     });
   });
+
+  it("does not access the HttpOnly session cookie from JavaScript", async () => {
+    const originalDescriptor = Object.getOwnPropertyDescriptor(document, "cookie");
+    const cookieGetter = vi.fn(() => {
+      throw new Error("session cookie must not be read by JavaScript");
+    });
+    Object.defineProperty(document, "cookie", { configurable: true, get: cookieGetter });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 204 }));
+
+    try {
+      await logout();
+      await logoutAll();
+    } finally {
+      if (originalDescriptor) {
+        Object.defineProperty(document, "cookie", originalDescriptor);
+      } else {
+        Reflect.deleteProperty(document, "cookie");
+      }
+    }
+
+    expect(cookieGetter).not.toHaveBeenCalled();
+  });
 });
