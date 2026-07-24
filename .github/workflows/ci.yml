@@ -161,7 +161,10 @@ jobs:
           done
           curl --fail --silent --show-error http://localhost:8100/api/v1/health >/dev/null
           docker compose exec -T api alembic current | grep -F "003 (head)"
-          test "$(docker compose exec -T postgres psql -U pepe -d pepe -tAc \"SELECT to_regclass('public.user_sessions') IS NOT NULL\")" = "t"
+          test "$(
+            docker compose exec -T postgres psql -U pepe -d pepe -tAc \
+              "SELECT to_regclass('public.user_sessions') IS NOT NULL"
+          )" = "t"
 
           python - <<'PY' >/tmp/pepe-session-payload.json
           import hashlib
