@@ -49,6 +49,8 @@ jobs:
   migration:
     name: Migration
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: apps/api
@@ -70,6 +72,8 @@ jobs:
       DATABASE_URL: postgresql+asyncpg://pepe:change_me@localhost:5432/pepe
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-python@v5
         with:
