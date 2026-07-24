@@ -10,17 +10,19 @@ Telegram Mini App для рыночной аналитики криптовал�
 
 **Этап 3 — Telegram users persistence** — completed and merged.
 
-**Этап 4 — Sessions and API authorization** — implementation in review: [PR #5](https://github.com/Deko-sudo/pepe/pull/5). Not merged.
+**Этап 4 — Sessions and API authorization** — completed and merged in [PR #5](https://github.com/Deko-sudo/pepe/pull/5).
 
-**Прогресс:** completed 3/12, remaining 9/12, progress by stages 25%.
+**Этап 5 — Asset catalog and market provider abstraction** — implementation in progress.
+
+**Прогресс:** completed and merged 4/12, remaining 8/12, progress by stages 33%.
 
 ## Дорожная карта
 
 1. Technical foundation — completed and merged.
 2. Telegram Mini App `initData` validation — completed and merged.
 3. Telegram users persistence — completed and merged.
-4. Sessions and API authorization — implementation in review in [PR #5](https://github.com/Deko-sudo/pepe/pull/5); not merged.
-5. Asset catalog and market provider abstraction — not started.
+4. Sessions and API authorization — completed and merged in [PR #5](https://github.com/Deko-sudo/pepe/pull/5).
+5. Asset catalog and market provider abstraction — implementation in progress; not complete until merged.
 6. Current quotes — not started.
 7. Candles and historical data — not started.
 8. Real market UI — not started.
@@ -29,7 +31,7 @@ Telegram Mini App для рыночной аналитики криптовал�
 11. AI Support and notifications — not started.
 12. Production hardening and launch — not started.
 
-Официальный Stage 4 contract and implementation record: [docs/architecture/stage-4-sessions-api-authorization.md](docs/architecture/stage-4-sessions-api-authorization.md). Completed and merged stages remain 1–3; Stage 4 is not completed or merged.
+Официальные records: [Stage 4](docs/architecture/stage-4-sessions-api-authorization.md) completed and merged; [Stage 5](docs/architecture/stage-5-asset-catalog-provider-abstraction.md) approved and in progress. Official completion remains 4/12 until Stage 5 is merged.
 
 ## Контекст будущих этапов (не реализовано)
 

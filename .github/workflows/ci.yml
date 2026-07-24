@@ -81,10 +81,14 @@ jobs:
 
       - run: pip install -e ".[dev]"
       - run: alembic upgrade head
-      - run: alembic current
+      - run: alembic current | grep -F "004 (head)"
+      - run: python ../../scripts/verify_asset_catalog_migration.py
       - run: PEPE_RUN_POSTGRES_INTEGRATION=1 pytest tests/test_session_concurrency_postgres.py -q
-      - run: alembic downgrade 002
+      - run: alembic downgrade 003
+      - run: alembic current | grep -F "003"
+      - run: python ../../scripts/verify_asset_catalog_migration.py --absent
       - run: alembic upgrade head
+      - run: python ../../scripts/verify_asset_catalog_migration.py
 
   bot:
     name: Bot
@@ -160,11 +164,15 @@ jobs:
             sleep 2
           done
           curl --fail --silent --show-error http://localhost:8100/api/v1/health >/dev/null
-          docker compose exec -T api alembic current | grep -F "003 (head)"
+          docker compose exec -T api alembic current | grep -F "004 (head)"
           test "$(
             docker compose exec -T postgres psql -U pepe -d pepe -tAc \
               "SELECT to_regclass('public.user_sessions') IS NOT NULL"
           )" = "t"
+          test "$(
+            docker compose exec -T postgres psql -U pepe -d pepe -tAc \
+              "SELECT count(*) FROM asset_instruments WHERE is_enabled"
+          )" = "3"
 
           python - <<'PY' >/tmp/pepe-session-payload.json
           import hashlib
