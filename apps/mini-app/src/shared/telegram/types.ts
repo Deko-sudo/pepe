@@ -16,4 +16,6 @@ export interface TelegramAuthState {
   state: TelegramValidationState;
   user: TelegramUser | null;
   error: string | null;
+  logout(): Promise<void>;
+  logoutAll(): Promise<void>;
 }

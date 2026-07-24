@@ -17,8 +17,15 @@ export const TelegramValidateResponseSchema = z.object({
   user: TelegramUserSchema,
 });
 
+export const UserProfileSchema = TelegramUserSchema.extend({
+  id: z.string().uuid(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
 export type TelegramUser = z.infer<typeof TelegramUserSchema>;
 export type TelegramValidateResponse = z.infer<typeof TelegramValidateResponseSchema>;
+export type UserProfile = z.infer<typeof UserProfileSchema>;
 
 export type TelegramValidationState =
   | "idle"

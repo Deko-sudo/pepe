@@ -1,3 +1,25 @@
+x-api-build: &api-build
+  context: ./apps/api
+  dockerfile: Dockerfile
+
+x-migrate-environment: &migrate-environment
+  DATABASE_URL: "${DATABASE_URL:-postgresql+asyncpg://pepe:change_me@postgres:5432/pepe}"
+
+x-api-environment: &api-environment
+  <<: *migrate-environment
+  REDIS_URL: "${REDIS_URL:-redis://redis:6379/0}"
+  CORS_ALLOWED_ORIGINS: "${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:4000,http://localhost:8080}"
+  APP_ENV: "${APP_ENV:-development}"
+  TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN:-}"
+  TELEGRAM_INIT_DATA_MAX_AGE_SECONDS: "${TELEGRAM_INIT_DATA_MAX_AGE_SECONDS:-3600}"
+  TELEGRAM_INIT_DATA_FUTURE_SKEW_SECONDS: "${TELEGRAM_INIT_DATA_FUTURE_SKEW_SECONDS:-30}"
+  SESSION_COOKIE_NAME: "${SESSION_COOKIE_NAME:-pepe_session}"
+  SESSION_ABSOLUTE_TTL_SECONDS: "${SESSION_ABSOLUTE_TTL_SECONDS:-2592000}"
+  SESSION_IDLE_TTL_SECONDS: "${SESSION_IDLE_TTL_SECONDS:-604800}"
+  SESSION_MAX_ACTIVE: "${SESSION_MAX_ACTIVE:-5}"
+  SESSION_COOKIE_SECURE: "${SESSION_COOKIE_SECURE:-false}"
+  SESSION_ALLOWED_ORIGINS: "${SESSION_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:4000,http://localhost:8080}"
+
 services:
   mini-app:
     container_name: pepe-mini-app
@@ -13,19 +35,14 @@ services:
 
   api:
     container_name: pepe-api
-    build:
-      context: ./apps/api
-      dockerfile: Dockerfile
+    image: pepe-api
+    build: *api-build
     ports:
       - "${API_EXT_PORT:-8100}:8000"
-    environment:
-      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://pepe:change_me@postgres:5432/pepe}
-      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
-      - APP_ENV=${APP_ENV:-development}
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
-      - TELEGRAM_INIT_DATA_MAX_AGE_SECONDS=${TELEGRAM_INIT_DATA_MAX_AGE_SECONDS:-3600}
-      - TELEGRAM_INIT_DATA_FUTURE_SKEW_SECONDS=${TELEGRAM_INIT_DATA_FUTURE_SKEW_SECONDS:-30}
+    environment: *api-environment
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -36,6 +53,19 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    networks:
+      - pepe-network
+
+  migrate:
+    container_name: pepe-migrate
+    image: pepe-api
+    build: *api-build
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+    environment: *migrate-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - pepe-network
 

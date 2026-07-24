@@ -3,205 +3,85 @@
 ## Status
 
 ```text
-Status: PROPOSED — PENDING USER APPROVAL
-Implementation: NOT STARTED
-Feature branch: NOT CREATED
-Pull Request: NOT CREATED
+Contract: APPROVED
+Implementation: IN REVIEW
+Feature branch: feat/stage-4-sessions-api-authorization
+Base: d99820d2df9e5e4a31ddf7d962fb1b860430e6f8
+Pull Request: https://github.com/Deko-sudo/pepe/pull/5
 ```
 
-This document records recommendations and questions for Stage 4. It is not an approved API, security, data, or frontend contract. No proposal below authorizes implementation.
+Stage 4 introduces server-side authorization only. It does not implement Stage 5 or later roadmap work.
 
-## Context
+## Session mechanism
 
-Stage 3 added persistence for Telegram users after server-side Telegram Mini App `initData` validation. Its current temporary profile endpoint is:
+- Opaque server-side sessions only; no JWT, access token, refresh token, bearer storage, `localStorage`, or `sessionStorage`.
+- A 256-bit (`secrets.token_urlsafe(32)`) raw token exists only while setting or reading the cookie.
+- PostgreSQL stores only a SHA-256 hexadecimal digest (`VARCHAR(64)`); no raw token, raw Telegram `initData`, IP, User-Agent, device name, or fingerprint is persisted or logged.
 
-```http
-POST /api/v1/users/me
-Content-Type: application/json
+## Cookie policy
 
-{"init_data":"..."}
-```
+- Name is configurable (`pepe_session` by default).
+- `HttpOnly`, `SameSite=Lax`, `Path=/`, host-only (no `Domain` attribute).
+- `Secure=true` is required in production; local HTTP development uses `Secure=false`.
+- `Max-Age=2592000`; `Expires` equals the session absolute expiry.
+- Logout uses matching Path, Secure, HttpOnly, and SameSite attributes while deleting the cookie.
 
-It revalidates `init_data` in the request body and returns the persisted profile. Sessions and JWT are absent. Raw `initData` is not stored. Stage 4 is intended to separate a Telegram login exchange from subsequent authenticated requests, but the mechanism and migration behavior remain pending approval.
+## Lifetime and revocation
 
-## Goals
+- Absolute lifetime: 2,592,000 seconds (30 days), never extended.
+- Idle timeout: 604,800 seconds (7 days), sliding on each authenticated request and clamped to absolute expiry.
+- Authenticated refresh locks the session row and updates `last_seen_at` and `idle_expires_at` monotonically. A delayed request with an earlier captured time cannot regress either value; absolute expiry never changes.
+- Repeated verified Telegram login revokes any presented active cookie session, then creates a new token/session with new absolute and idle lifetimes.
+- Invalid, unknown, expired, malformed, and revoked credentials receive the same generic 401 response.
 
-Subject to approval, Stage 4 should:
+## Concurrent sessions and logout-all linearization
 
-- create a server authorization session after verified Telegram `initData`;
-- stop sending raw `initData` on each protected API request;
-- add authenticated `GET /api/v1/users/me`;
-- add logout and revocation behavior;
-- keep any raw session token only on the client transport;
-- store only a token digest in the database;
-- provide a safe Mini App bootstrap flow.
+`user_sessions` permits at most five active sessions per user. Creation and logout-all both lock the corresponding `users` row with `SELECT ... FOR UPDATE`, making them linearizable relative to one another. When creation obtains the lock first, a following logout-all revokes the newly created active session. When logout-all obtains the lock first, a subsequent login is a later operation and may create a new session. Logout-all does not promise to prohibit future verified logins.
 
-## Explicit non-goals
+When creating the sixth active session, the deterministic oldest active session (`created_at ASC, id ASC`) is revoked. Expired and already revoked rows do not count.
 
-The following are not part of Stage 4 unless separately approved:
+## Schema and migration
 
-- JWT or refresh-token architecture;
-- roles, permissions, or an admin panel;
-- payments;
-- market providers, assets, quotes, candles, analytics, or any Stage 5 functionality.
+Alembic revision `003_create_user_sessions.py` extends `001 -> 002 -> 003` with:
 
-## Recommended architecture — pending approval
+- `id UUID PRIMARY KEY`;
+- `user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE` and a user lookup index;
+- unique `token_digest VARCHAR(64)` lookup constraint;
+- `created_at`, `expires_at`, `idle_expires_at`, `last_seen_at`, and nullable `revoked_at` timezone-aware timestamps.
 
-**Recommended, not approved:** an opaque server-side session.
+Downgrade removes only `user_sessions` and its user index.
 
-- Generate a cryptographically random opaque session token with at least 256 bits of entropy.
-- Send that token in an `HttpOnly` cookie; do not return it in JSON or store it in browser storage.
-- Store only a SHA-256 token digest and session metadata in PostgreSQL.
-- Enable `Secure` in production.
-- Use `SameSite=Lax` as a proposed starting point, pending an explicit cookie/CSRF decision.
-- Reject expired and revoked sessions.
-- Make logout set `revoked_at` and clear the client transport credential.
+Docker Compose has a one-shot `migrate` service that uses the API image and the same settings mapping as API. It waits for PostgreSQL health, runs `alembic upgrade head`, and exits. API waits for `migrate` with `service_completed_successfully`, so it does not start after a migration failure. `make up` and `docker compose up -d` use this dependency graph.
 
-These details are recommendations. Cookie strategy, expiration, concurrency, metadata, and endpoint migration have not been approved.
+## API
 
-## Alternatives
+| Endpoint | Behavior |
+| --- | --- |
+| `POST /api/v1/auth/telegram/session` | Exact CSRF Origin/Referer check, Telegram HMAC/freshness validation, user upsert, presented-session rotation, session creation, HttpOnly cookie, and `UserProfile` response without a token. |
+| `GET /api/v1/users/me` | Cookie-only authenticated profile; refreshes monotonic `last_seen_at` and idle expiry. |
+| `POST /api/v1/auth/logout` | CSRF-protected, idempotent current-session revocation and cookie clearing; `204`. |
+| `POST /api/v1/auth/logout-all` | CSRF-protected, requires an active session, serializes with session creation through the user-row lock, revokes active sessions for its user only, clears cookie; `204`. |
+| `POST /api/v1/auth/telegram/validate` | Preserved Stage-3 validation and user-upsert compatibility behavior. |
+| `POST /api/v1/users/me` | Preserved legacy body-based profile behavior and marked deprecated in OpenAPI. |
 
-| Option | Security properties | Revocation complexity | Frontend storage risk | Telegram WebView compatibility | Implementation complexity | Operational complexity |
-| --- | --- | --- | --- | --- | --- | --- |
-| **Opaque server-side session in cookie** (recommended) | Raw credential can be `HttpOnly`; database retains only digest; server can enforce expiry/revocation | Low: revoke a database row | Low if `HttpOnly`; CSRF protections are still required | Good for same-origin Mini App/API deployment | Moderate | Moderate: session persistence and cleanup |
-| **Access JWT + refresh token** | Stateless access JWT is exposed until expiry; refresh-token protection/design required | Higher: requires denylist/rotation or short expiries | Medium to high if any token is JavaScript-accessible; cookie use reintroduces CSRF concerns | Compatible, but more moving parts | High | High: signing keys, rotation, refresh lifecycle, denylist |
-| **Opaque bearer token** | Can be hashed server-side and revoked, but client must present token explicitly | Low to moderate: revoke digest | High: Mini App must retain and read a bearer credential | Compatible but less safe for browser-like clients | Low to moderate | Moderate: token lifecycle and exposure monitoring |
+## CSRF
 
-## Proposed endpoints — pending approval
+New session mutation endpoints require an exact allowlisted Origin. If Origin is absent, an exact origin extracted from Referer is allowed; `null`, missing, malformed, suffix, wrong-scheme, and wrong-port values are rejected. A disallowed Origin never falls back to Referer. Production refuses to start without Secure cookies and non-empty valid HTTP/HTTPS origins. Development allowlist is exactly `http://localhost:3000`, `http://localhost:4000`, and `http://localhost:8080`.
 
-### Telegram session exchange
+## Frontend bootstrap and logout
 
-```http
-POST /api/v1/auth/telegram/session
-Content-Type: application/json
+The Mini App first calls `GET /api/v1/users/me` with `credentials: "include"`. Only a 401 and available Telegram `initData` cause `POST /api/v1/auth/telegram/session`, also with `credentials: "include"`. An instance-local single-flight promise prevents React development StrictMode from performing duplicate concurrent bootstrap checks or exchanges; a true provider remount receives a new guard.
 
-{"init_data":"..."}
-```
+`TelegramAuthContext` exposes `logout()` and `logoutAll()` actions. After a successful `204`, each clears `user`, sets state to `idle`, and clears the UI error. On failure, the confirmed user/state remain intact and the error is exposed to UI. Raw `initData` and session tokens are never persisted or read by JavaScript; HttpOnly cookie removal remains server-side.
 
-**Proposed behavior:**
+## Validation
 
-1. Verify Telegram HMAC.
-2. Verify `auth_date` freshness.
-3. Upsert the verified user.
-4. Create a session.
-5. Set a cookie or return a token only according to the mechanism approved by the user.
-6. Do not persist raw `initData`.
+The feature branch contains API security/schema/endpoint tests, Mini App client/bootstrap tests, rendered Compose deployment-contract validation, and real PostgreSQL concurrency tests gated by `PEPE_RUN_POSTGRES_INTEGRATION=1`. CI runs the PostgreSQL tests after `alembic upgrade head` and runs a disposable fresh-Compose smoke: migration completion, API health, Alembic head, `user_sessions` existence, session exchange, authenticated profile, logout-all, revoked-cookie 401, and logs without test credentials or cookie/digest material. Runtime validation uses PostgreSQL, never SQLite.
 
-### Authenticated profile
+## Retention
 
-```http
-GET /api/v1/users/me
-```
+Revoked and expired session rows are retained as Stage-4 audit records. Automatic cleanup and an exact retention duration are not approved. Retention policy and cleanup belong to Stage 12 production hardening; their absence does not affect the five-active-session limit because that limit counts only active rows.
 
-**Proposed behavior:** authenticate using the approved session mechanism and return the persisted public user profile.
+## Explicit exclusions
 
-### Logout
-
-```http
-POST /api/v1/auth/logout
-```
-
-**Proposed behavior:** invalidate the current session according to the approved logout policy.
-
-### Optional logout-all
-
-```http
-POST /api/v1/auth/logout-all
-```
-
-This endpoint is optional and requires a separate user decision about concurrent sessions and logout-all behavior.
-
-## Proposed session schema — pending approval
-
-A proposed `user_sessions` table contains:
-
-- `id`: UUID;
-- `user_id`: foreign key to `users.id`;
-- `token_digest`: one-way digest only;
-- `created_at`;
-- `expires_at`;
-- `last_seen_at`;
-- `revoked_at`;
-- optional `user_agent`;
-- optional IP metadata only when a confirmed operational/security need exists.
-
-It must not contain raw Telegram `initData` or raw session tokens. Exact indexes, retention, cleanup, metadata, and whether `last_seen_at` is written on each request remain pending approval.
-
-## Security model — requirements to approve
-
-The implementation proposal must be reviewed against these requirements before work begins:
-
-- Generate tokens with a cryptographically secure random generator and at least 256 bits of entropy.
-- Use constant-time digest comparison where direct digest comparison is applicable; database lookups must not disclose token state through response differences.
-- For cookies, enable `Secure` in production and `HttpOnly` always; select `SameSite` only after approval.
-- Choose and document CSRF protection for cookie-authenticated state changes.
-- Define CORS and Origin/Referer verification behavior for the deployed Mini App origin.
-- Prevent session fixation by issuing a new credential after successful login exchange; define any subsequent rotation policy.
-- Define expiry, idle timeout, sliding expiration, and rotation policy.
-- Define current-session logout, optional logout-all, and revocation semantics.
-- Rate-limit login exchange without breaking Telegram WebView usage.
-- Prohibit logging of cookie values, raw session tokens, token digests, and raw `initData`.
-
-## Migration plan — pending approval
-
-Current Stage 3 state:
-
-```http
-POST /api/v1/users/me
-{"init_data":"..."}
-```
-
-Proposed Stage 4 target:
-
-```http
-POST /api/v1/auth/telegram/session
-GET  /api/v1/users/me
-POST /api/v1/auth/logout
-```
-
-`POST /api/v1/users/me` must not be removed without a migration period or an explicit user decision. The future of `POST /api/v1/auth/telegram/validate`, which currently validates initData and upserts a user, also requires an explicit decision: compatibility endpoint, pure validation endpoint, deprecation, or replacement by the exchange endpoint.
-
-## Test plan
-
-Before Stage 4 can be accepted, implementation tests should cover:
-
-- valid login creates a session;
-- repeated-login behavior;
-- invalid or expired `initData` creates neither user nor session;
-- missing Telegram token is handled safely;
-- valid credential authenticates `GET /api/v1/users/me`;
-- missing credential returns 401;
-- unknown credential returns 401;
-- expired session returns 401;
-- revoked session returns 401;
-- logout invalidates the current session;
-- logout is idempotent according to the approved contract;
-- raw tokens are absent from the database;
-- raw tokens and raw `initData` are absent from logs;
-- CSRF behavior;
-- CORS behavior;
-- concurrent-session behavior;
-- migration upgrade and downgrade;
-- PostgreSQL runtime integration tests.
-
-## Required decisions — all pending user approval
-
-| # | Decision | Options / questions | Recommendation |
-| --- | --- | --- | --- |
-| 1 | Session mechanism | Opaque server-side cookie session; JWT access + refresh; opaque bearer token | Opaque server-side session + `HttpOnly` cookie |
-| 2 | Cookie policy | `HttpOnly`; `Secure` in production; `SameSite=Lax`, `Strict`, or `None`; path; domain; local-development behavior | `HttpOnly`, production `Secure`, host-only path `/`; exact SameSite pending |
-| 3 | Session lifetime | Absolute lifetime; idle timeout; sliding expiration; rotation frequency | No value is proposed as approved; define explicitly |
-| 4 | Concurrent sessions | One active session; one per device; multiple active sessions; fixed limit | Choose explicitly based on product/device needs |
-| 5 | Logout | Current session only; separate logout-all; idempotency | Current-session logout plus optional logout-all endpoint |
-| 6 | CSRF | SameSite + Origin/Referer verification; synchronizer token; double-submit token; another documented mechanism | Choose after deployment-origin/cookie policy is decided |
-| 7 | Stage 3 endpoint migration | Keep temporary endpoint; deprecation period; remove in Stage 4; compatibility adapter | Keep `POST /api/v1/users/me` for one migration period and mark deprecated |
-| 8 | Validation endpoint side effect | Keep compatibility behavior; make pure validation; deprecate after exchange; replace by exchange | Explicit product/API decision required |
-| 9 | Session metadata | `user_agent`; IP; device name; `last_seen_at` | Do not add fingerprinting metadata without confirmed need |
-
-## Implementation gate
-
-```text
-Stage 4 implementation MUST NOT begin until every required contract decision is explicitly approved by the user.
-```
-
-Until then, the following must not be created or changed: a Stage 4 feature branch, migration `003`, a session model/table, authentication middleware/dependency, frontend authentication flow, or a Stage 4 implementation PR.
+No JWT, refresh tokens, bearer token persistence, roles, permissions, IP/device/fingerprint metadata, cleanup worker, scheduled deletion, hardcoded retention duration, market providers, assets, quotes, candles, analytics, or other Stage-5 functionality are included.
