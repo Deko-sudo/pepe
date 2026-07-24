@@ -1,6 +1,6 @@
 import React from "react";
-import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import { TelegramProvider } from "../src/shared/telegram/provider";
 import { useTelegramAuth } from "../src/shared/telegram/context";
@@ -47,6 +47,12 @@ const profile = {
   created_at: "2026-07-24T00:00:00Z",
   updated_at: "2026-07-24T00:00:00Z",
 };
+
+afterEach(() => {
+  cleanup();
+  delete (window as Record<string, unknown>).Telegram;
+  vi.restoreAllMocks();
+});
 
 describe("session bootstrap", () => {
   it("uses an existing cookie session before Telegram exchange", async () => {
