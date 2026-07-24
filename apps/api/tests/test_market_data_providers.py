@@ -59,6 +59,22 @@ def test_enabled_mapping_selection_is_priority_then_provider_key() -> None:
     assert selected.provider_symbol == "BTC-USDT"
 
 
+def test_mapping_selection_ignores_enabled_mappings_for_other_instruments() -> None:
+    instrument_id = uuid.UUID("11111111-1111-1111-1111-111111111111")
+    other_instrument_id = uuid.UUID("22222222-2222-2222-2222-222222222222")
+
+    selected = select_mapping(
+        instrument_id,
+        [
+            ProviderMapping(other_instrument_id, "alpha", "ETH-USDT", "spot", 1, True),
+            ProviderMapping(instrument_id, "zeta", "BTC-USDT", "spot", 2, True),
+        ],
+    )
+
+    assert selected.instrument_id == instrument_id
+    assert selected.provider_key == "zeta"
+
+
 def test_mapping_selection_normalizes_absence_to_domain_error() -> None:
     with pytest.raises(InstrumentNotMapped):
         select_mapping(uuid.uuid4(), [])

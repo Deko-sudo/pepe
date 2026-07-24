@@ -63,6 +63,17 @@ def upgrade() -> None:
             name="ck_asset_instruments_calendar_kind",
         ),
         sa.CheckConstraint(
+            "(asset_class IN ('crypto_spot', 'metal_fx_spot') "
+            "AND market_type = 'spot' "
+            "AND base_asset IS NOT NULL "
+            "AND quote_asset IS NOT NULL) "
+            "OR (asset_class IN ('equity_index', 'currency_index') "
+            "AND market_type = 'reference_index') "
+            "OR (asset_class = 'government_yield' "
+            "AND market_type = 'yield_reference')",
+            name="ck_asset_instruments_market_semantics",
+        ),
+        sa.CheckConstraint(
             "price_precision >= 0 AND price_precision <= 12",
             name="ck_asset_instruments_price_precision",
         ),

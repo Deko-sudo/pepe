@@ -75,7 +75,7 @@ The public surface is session-protected and read-only. All storage fields are bo
 
 ## Testing and CI
 
-Tests cover domain validation, provider contracts/error safety, model constraints, mapping selection and API authorization/response boundaries. Migration CI validates the exact seeded rows and empty mapping table after upgrade and re-upgrade. Compose smoke validates revision `004`, catalog tables and seeded asset count before API startup.
+Tests cover domain validation, provider contracts/error safety, model constraints, mapping selection and API authorization/response boundaries. Migration CI validates the exact seeded rows and empty mapping table after upgrade and re-upgrade. Compose smoke validates revision `004`, catalog tables and seeded asset count after API startup and successful `/api/v1/health` polling.
 
 ## Deferred work and Stage-6 boundary
 

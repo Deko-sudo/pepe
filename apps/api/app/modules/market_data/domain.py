@@ -29,7 +29,7 @@ class CalendarKind(StrEnum):
 
 
 _SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-_IDENTIFIER_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+_IDENTIFIER_PATTERN = _SLUG_PATTERN
 _MAX_PRECISION = 12
 _MAX_METADATA_VERSION = 2_147_483_647
 

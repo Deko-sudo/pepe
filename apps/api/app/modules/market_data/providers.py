@@ -77,7 +77,11 @@ def select_mapping(
     instrument_id: uuid.UUID,
     mappings: Iterable[ProviderMapping],
 ) -> ProviderSelection:
-    enabled = [mapping for mapping in mappings if mapping.is_enabled]
+    enabled = [
+        mapping
+        for mapping in mappings
+        if mapping.instrument_id == instrument_id and mapping.is_enabled
+    ]
     if not enabled:
         raise InstrumentNotMapped()
     selected = min(enabled, key=lambda mapping: (mapping.priority, mapping.provider_key))

@@ -18,24 +18,38 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.modules.market_data.domain import AssetClass, CalendarKind, MarketType
+
+_ASSET_CLASS_VALUES = ", ".join(f"'{asset_class.value}'" for asset_class in AssetClass)
+_MARKET_TYPE_VALUES = ", ".join(f"'{market_type.value}'" for market_type in MarketType)
+_CALENDAR_KIND_VALUES = ", ".join(f"'{calendar_kind.value}'" for calendar_kind in CalendarKind)
 
 
 class AssetInstrument(Base):
     __tablename__ = "asset_instruments"
     __table_args__ = (
         CheckConstraint(
-            "asset_class IN "
-            "('crypto_spot', 'metal_fx_spot', 'equity_index', "
-            "'currency_index', 'government_yield')",
+            f"asset_class IN ({_ASSET_CLASS_VALUES})",
             name="ck_asset_instruments_asset_class",
         ),
         CheckConstraint(
-            "market_type IN ('spot', 'reference_index', 'yield_reference')",
+            f"market_type IN ({_MARKET_TYPE_VALUES})",
             name="ck_asset_instruments_market_type",
         ),
         CheckConstraint(
-            "calendar_kind IN ('always_open', 'provider_session', 'exchange', 'reference_data')",
+            f"calendar_kind IN ({_CALENDAR_KIND_VALUES})",
             name="ck_asset_instruments_calendar_kind",
+        ),
+        CheckConstraint(
+            "(asset_class IN ('crypto_spot', 'metal_fx_spot') "
+            "AND market_type = 'spot' "
+            "AND base_asset IS NOT NULL "
+            "AND quote_asset IS NOT NULL) "
+            "OR (asset_class IN ('equity_index', 'currency_index') "
+            "AND market_type = 'reference_index') "
+            "OR (asset_class = 'government_yield' "
+            "AND market_type = 'yield_reference')",
+            name="ck_asset_instruments_market_semantics",
         ),
         CheckConstraint(
             "price_precision >= 0 AND price_precision <= 12",

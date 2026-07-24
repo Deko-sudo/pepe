@@ -11,9 +11,57 @@ from sqlalchemy import text
 from app.db.session import engine
 
 EXPECTED_ASSETS = [
-    ("a6d8c260-3f98-4d19-9e87-8dd33413b401", "btc-usdt", "BTC/USDT"),
-    ("32cad99d-7cd7-4c7e-9e11-692d84984d02", "eth-usdt", "ETH/USDT"),
-    ("d3894b52-0d06-4ce6-934a-e0457e466803", "xau-usd", "XAU/USD"),
+    (
+        "a6d8c260-3f98-4d19-9e87-8dd33413b401",
+        "btc-usdt",
+        "BTC/USDT",
+        "Bitcoin / Tether",
+        "crypto_spot",
+        "spot",
+        "BTC",
+        "USDT",
+        2,
+        8,
+        "UTC",
+        "always_open",
+        "crypto-24x7",
+        True,
+        1,
+    ),
+    (
+        "32cad99d-7cd7-4c7e-9e11-692d84984d02",
+        "eth-usdt",
+        "ETH/USDT",
+        "Ethereum / Tether",
+        "crypto_spot",
+        "spot",
+        "ETH",
+        "USDT",
+        2,
+        8,
+        "UTC",
+        "always_open",
+        "crypto-24x7",
+        True,
+        1,
+    ),
+    (
+        "d3894b52-0d06-4ce6-934a-e0457e466803",
+        "xau-usd",
+        "XAU/USD",
+        "Gold / US Dollar",
+        "metal_fx_spot",
+        "spot",
+        "XAU",
+        "USD",
+        2,
+        None,
+        "UTC",
+        "provider_session",
+        "xau-usd-provider-session",
+        True,
+        1,
+    ),
 ]
 
 
@@ -28,8 +76,10 @@ async def verify(expect_absent: bool = False) -> None:
         assets = (
             await connection.execute(
                 text(
-                    "SELECT id::text, slug, symbol FROM asset_instruments "
-                    "WHERE is_enabled ORDER BY slug",
+                    "SELECT id::text, slug, symbol, display_name, asset_class, market_type, "
+                    "base_asset, quote_asset, price_precision, quantity_precision, timezone, "
+                    "calendar_kind, trading_calendar, is_enabled, metadata_version "
+                    "FROM asset_instruments ORDER BY slug",
                 ),
             )
         ).all()

@@ -20,6 +20,17 @@ def test_asset_instrument_model_has_provider_independent_catalog_columns() -> No
     assert not {"provider_symbol", "provider_key", "credential", "api_key"} & set(table.c.keys())
 
 
+def test_asset_instrument_model_enforces_cross_column_market_semantics() -> None:
+    table = cast(Table, AssetInstrument.__table__)
+    constraint_names = {
+        constraint.name
+        for constraint in table.constraints
+        if isinstance(constraint, CheckConstraint)
+    }
+
+    assert "ck_asset_instruments_market_semantics" in constraint_names
+
+
 def test_provider_mapping_model_has_business_constraints_and_restricted_delete() -> None:
     table = cast(Table, ProviderInstrumentMapping.__table__)
     unique_names = {
