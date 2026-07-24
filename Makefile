@@ -35,9 +35,9 @@ lint: ## Run linters
 
 format: ## Format code
 	cd apps/mini-app && npm run lint -- --fix
-	cd apps/api && ruff format .
-	cd apps/bot && ruff format .
-	cd apps/worker && ruff format .
+	cd apps/api && .venv/bin/ruff format .
+	cd apps/bot && .venv/bin/ruff format .
+	cd apps/worker && .venv/bin/ruff format .
 
 typecheck: ## Run type checkers
 	cd apps/mini-app && npm run typecheck
