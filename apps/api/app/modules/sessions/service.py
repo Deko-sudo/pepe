@@ -60,7 +60,7 @@ async def get_active_session_by_token(
 ) -> UserSession | None:
     statement = select(UserSession).where(UserSession.token_digest == digest_session_token(token))
     if lock_for_update:
-        statement = statement.with_for_update()
+        statement = statement.with_for_update().execution_options(populate_existing=True)
     result = await db.execute(statement)
     session = result.scalar_one_or_none()
     if session is None or not is_active_session(

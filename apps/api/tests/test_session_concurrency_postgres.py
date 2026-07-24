@@ -8,17 +8,24 @@ from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import delete, select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy import delete, event, select
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from app.db.models.user import User
 from app.db.models.user_session import UserSession
 from app.modules.sessions.service import (
+    AuthenticatedSession,
     create_session,
     digest_session_token,
     is_active_session,
     resolve_authenticated_session,
     revoke_all_active_sessions,
+    revoke_presented_session,
 )
 
 pytestmark = pytest.mark.skipif(
@@ -189,6 +196,70 @@ async def test_authenticated_session_locks_user_before_presented_session(
             resolution_task.cancel()
             with suppress(asyncio.CancelledError):
                 await resolution_task
+        await delete_test_user(postgres_sessions, user_id)
+
+
+@pytest.mark.asyncio
+async def test_authenticated_session_revalidates_after_concurrent_logout(
+    postgres_sessions: async_sessionmaker[AsyncSession],
+) -> None:
+    user_id = await create_test_user(postgres_sessions)
+    now = datetime.now(UTC)
+    _, token = await create_committed_session(postgres_sessions, user_id, now=now)
+    initial_lookup_completed = asyncio.Event()
+    resolver_task: asyncio.Task[None] | None = None
+    resolution_result: list[AuthenticatedSession | None] = []
+    engine = postgres_sessions.kw["bind"]
+    assert isinstance(engine, AsyncEngine)
+    loop = asyncio.get_running_loop()
+
+    def record_initial_session_lookup(
+        _connection: object,
+        _cursor: object,
+        statement: str,
+        _parameters: object,
+        _context: object,
+        _executemany: object,
+    ) -> None:
+        if "FROM user_sessions" in statement and "FOR UPDATE" not in statement:
+            loop.call_soon_threadsafe(initial_lookup_completed.set)
+
+    event.listen(engine.sync_engine, "after_cursor_execute", record_initial_session_lookup)
+    try:
+        async with postgres_sessions() as locking_db:
+            await locking_db.execute(select(User.id).where(User.id == user_id).with_for_update())
+
+            async def resolve_while_user_is_locked() -> None:
+                async with postgres_sessions() as db:
+                    resolution_result.append(
+                        await resolve_authenticated_session(
+                            db,
+                            token,
+                            idle_ttl_seconds=604_800,
+                            now=now + timedelta(seconds=1),
+                        ),
+                    )
+                    await db.commit()
+
+            resolver_task = asyncio.create_task(resolve_while_user_is_locked())
+            await asyncio.wait_for(initial_lookup_completed.wait(), timeout=2)
+            with pytest.raises(TimeoutError):
+                await asyncio.wait_for(asyncio.shield(resolver_task), timeout=0.2)
+
+            async with postgres_sessions() as revoking_db:
+                await revoke_presented_session(revoking_db, token, now=now + timedelta(seconds=1))
+                await revoking_db.commit()
+
+            await locking_db.commit()
+
+        await asyncio.wait_for(resolver_task, timeout=2)
+        assert resolution_result == [None]
+    finally:
+        event.remove(engine.sync_engine, "after_cursor_execute", record_initial_session_lookup)
+        if resolver_task is not None and not resolver_task.done():
+            resolver_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await resolver_task
         await delete_test_user(postgres_sessions, user_id)
 
 
