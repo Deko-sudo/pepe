@@ -49,7 +49,7 @@ def test_enabled_mapping_selection_is_priority_then_provider_key() -> None:
     selected = select_mapping(
         instrument_id,
         [
-            ProviderMapping(instrument_id, "zeta", "BTCUSDT", "spot", 2, True),
+            ProviderMapping(instrument_id, "zeta", "BTCUSDT", "spot", 1, True),
             ProviderMapping(instrument_id, "alpha", "BTC-USDT", "spot", 1, True),
             ProviderMapping(instrument_id, "disabled", "BTC", "spot", 3, False),
         ],
