@@ -51,7 +51,7 @@ def test_enabled_mapping_selection_is_priority_then_provider_key() -> None:
         [
             ProviderMapping(instrument_id, "zeta", "BTCUSDT", "spot", 2, True),
             ProviderMapping(instrument_id, "alpha", "BTC-USDT", "spot", 1, True),
-            ProviderMapping(instrument_id, "disabled", "BTC", "spot", 0, False),
+            ProviderMapping(instrument_id, "disabled", "BTC", "spot", 3, False),
         ],
     )
 
@@ -85,3 +85,23 @@ def test_provider_health_contract_is_immutable() -> None:
 
     with pytest.raises(AttributeError):
         health.is_available = False  # type: ignore[misc]
+
+
+@pytest.mark.parametrize(
+    ("priority", "mapping_version"),
+    [(0, 1), (-1, 1), (1, 0), (1, -1)],
+)
+def test_provider_mapping_requires_positive_persistence_versions(
+    priority: int,
+    mapping_version: int,
+) -> None:
+    with pytest.raises(ValueError, match="must be positive"):
+        ProviderMapping(
+            uuid.uuid4(),
+            "example",
+            "BTC-USDT",
+            "spot",
+            priority,
+            True,
+            mapping_version,
+        )

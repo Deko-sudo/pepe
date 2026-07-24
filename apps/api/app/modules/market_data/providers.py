@@ -48,6 +48,12 @@ class ProviderMapping:
     is_enabled: bool
     mapping_version: int = 1
 
+    def __post_init__(self) -> None:
+        if self.priority <= 0:
+            raise ValueError("Provider mapping priority must be positive.")
+        if self.mapping_version <= 0:
+            raise ValueError("Provider mapping version must be positive.")
+
 
 @dataclass(frozen=True, slots=True)
 class ProviderSelection:
