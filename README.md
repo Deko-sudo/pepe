@@ -10,7 +10,7 @@ Telegram Mini App для рыночной аналитики криптовал�
 
 **Этап 3 — Telegram users persistence** — completed and merged.
 
-**Этап 4 — Sessions and API authorization** — implementation in progress in feature branch / PR. Not merged.
+**Этап 4 — Sessions and API authorization** — implementation in review: [PR #5](https://github.com/Deko-sudo/pepe/pull/5). Not merged.
 
 **Прогресс:** completed 3/12, remaining 9/12, progress by stages 25%.
 
@@ -19,7 +19,7 @@ Telegram Mini App для рыночной аналитики криптовал�
 1. Technical foundation — completed and merged.
 2. Telegram Mini App `initData` validation — completed and merged.
 3. Telegram users persistence — completed and merged.
-4. Sessions and API authorization — implementation in progress in feature branch / PR; not merged.
+4. Sessions and API authorization — implementation in review in [PR #5](https://github.com/Deko-sudo/pepe/pull/5); not merged.
 5. Asset catalog and market provider abstraction — not started.
 6. Current quotes — not started.
 7. Candles and historical data — not started.
@@ -42,11 +42,11 @@ Telegram Mini App для рыночной аналитики криптовал�
 - **Stage 11:** AI explanation, notifications, preferences, rate limits и отсутствие финансовых обещаний.
 - **Stage 12:** security hardening, observability, backups, production migrations, secrets management, performance, rate limiting, deployment и launch checklist.
 
-## Реализованная граница Этапа 3
+## Историческая граница Этапа 3
 
-На этом этапе реализованы серверная проверка Telegram initData и создание/обновление Telegram-пользователей. **Не реализовано**:
+На момент завершения Stage 3 были реализованы серверная проверка Telegram initData и создание/обновление Telegram-пользователей. Следующее — исторический список того, что ещё не было реализовано на Stage 3; Stage 4 sessions authorization находится в review и описана в [Stage 4 contract](docs/architecture/stage-4-sessions-api-authorization.md).
 
-- Авторизация пользователей (sessions, JWT, tokens)
+- JWT и bearer-token authorization
 - Рыночные интеграции (Binance, OKX, CoinGecko, Gold API)
 - Определение тренда и FVG
 - Торговая аналитика
@@ -175,7 +175,7 @@ celery -A app.celery_app worker
 
 ```bash
 make help       # Показать доступные команды
-make up         # Запустить все сервисы
+make up         # Запустить все сервисы после успешных миграций
 make down       # Остановить все сервисы
 make build      # Собрать все образы
 make test       # Запустить все тесты
@@ -280,7 +280,11 @@ FastAPI сервис с эндпоинтами:
 - `GET /api/v1/ready` — Проверка зависимостей (200 OK / 503 Service Unavailable)
 - `GET /api/v1/version` — Информация о версии
 - `POST /api/v1/auth/telegram/validate` — Проверка Telegram initData
-- `POST /api/v1/users/me` — Профиль пользователя из проверенного Telegram initData
+- `POST /api/v1/users/me` — Legacy-профиль пользователя из проверенного Telegram initData (deprecated)
+- `POST /api/v1/auth/telegram/session` — Обмен проверенного Telegram initData на HttpOnly session cookie
+- `GET /api/v1/users/me` — Cookie-session профиль пользователя
+- `POST /api/v1/auth/logout` — Отзыв текущей cookie session
+- `POST /api/v1/auth/logout-all` — Отзыв всех активных sessions текущего пользователя
 
 ## Bot
 
@@ -330,8 +334,8 @@ docker compose exec redis redis-cli ping
 
 - Все данные на Dashboard являются демонстрационными
 - Нет реальных рыночных интеграций
-- Нет полноценной авторизации (профиль доступен только по повторно проверенному initData)
-- Нет сессий, JWT, refresh tokens
+- Stage 4 HttpOnly cookie sessions реализованы в review и ещё не merged; JWT, refresh tokens и bearer-token persistence не реализованы
+- Нет roles, permissions, IP/device/fingerprint metadata или retention cleanup policy; это не является частью Stage 4
 
 ## Telegram initData Validation
 
