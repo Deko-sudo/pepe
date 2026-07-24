@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     mini_app_url: str = "http://localhost"
     telegram_init_data_max_age_seconds: int = 3600
     telegram_init_data_future_skew_seconds: int = 30
-    cors_allowed_origins: str = "http://localhost,http://127.0.0.1"
+    cors_allowed_origins: str = "http://localhost:3000,http://localhost:4000,http://localhost:8080"
     session_cookie_name: str = "pepe_session"
     session_absolute_ttl_seconds: int = 2_592_000
     session_idle_ttl_seconds: int = 604_800
@@ -81,6 +81,8 @@ class Settings(BaseSettings):
                 or parsed.password is not None
             ):
                 raise ValueError("session_allowed_origins must contain absolute HTTP/HTTPS origins")
+        if not set(self.session_origins).issubset(self.cors_origins):
+            raise ValueError("session_allowed_origins must be included in cors_allowed_origins")
         return self
 
 

@@ -80,6 +80,7 @@ def test_settings_accepts_secure_normalized_production_environment() -> None:
     settings = Settings(
         environment=" Production ",
         session_cookie_secure=True,
+        cors_allowed_origins="https://mini.pepe.example",
         session_allowed_origins="https://mini.pepe.example",
     )
 
@@ -91,6 +92,14 @@ def test_settings_accepts_insecure_development_environment() -> None:
     settings = Settings(environment="development", session_cookie_secure=False)
 
     assert settings.environment == "development"
+
+
+def test_settings_rejects_session_origin_missing_from_cors_origins() -> None:
+    with pytest.raises(ValueError, match="session_allowed_origins must be included"):
+        Settings(
+            cors_allowed_origins="https://api.pepe.example",
+            session_allowed_origins="https://mini.pepe.example",
+        )
 
 
 @pytest.mark.parametrize("environment", ["Production", "PRODUCTION", " production "])

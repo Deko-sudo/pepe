@@ -48,6 +48,23 @@ async def test_session_mutations_require_origin_or_referer(
 
 
 @pytest.mark.asyncio
+async def test_configured_session_origin_passes_credentialed_cors_preflight(
+    client: AsyncClient,
+) -> None:
+    response = await client.options(
+        "/api/v1/auth/telegram/session",
+        headers={
+            "Origin": "http://localhost:4000",
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:4000"
+    assert response.headers["access-control-allow-credentials"] == "true"
+
+
+@pytest.mark.asyncio
 async def test_legacy_post_me_is_preserved_and_marked_deprecated(client: AsyncClient) -> None:
     schema = (await client.get("/openapi.json")).json()
     post_operation = schema["paths"]["/api/v1/users/me"]["post"]

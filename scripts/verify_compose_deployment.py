@@ -13,6 +13,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 API_ENVIRONMENT_KEYS = (
     "APP_ENV",
+    "CORS_ALLOWED_ORIGINS",
     "DATABASE_URL",
     "SESSION_COOKIE_NAME",
     "SESSION_ABSOLUTE_TTL_SECONDS",
@@ -24,6 +25,7 @@ API_ENVIRONMENT_KEYS = (
 MIGRATE_ENVIRONMENT_KEYS = ("DATABASE_URL",)
 CUSTOM_ENVIRONMENT = {
     "APP_ENV": "production",
+    "CORS_ALLOWED_ORIGINS": "https://mini.example.com",
     "DATABASE_URL": "postgresql+asyncpg://custom:custom@postgres:5432/custom",
     "SESSION_COOKIE_NAME": "custom_session",
     "SESSION_ABSOLUTE_TTL_SECONDS": "2592000",
@@ -99,6 +101,7 @@ def assert_migration_contract(rendered: dict[str, Any], expected_environment: di
 def main() -> int:
     defaults = {
         "APP_ENV": "development",
+        "CORS_ALLOWED_ORIGINS": "http://localhost:3000,http://localhost:4000,http://localhost:8080",
         "DATABASE_URL": "postgresql+asyncpg://pepe:change_me@postgres:5432/pepe",
         "SESSION_COOKIE_NAME": "pepe_session",
         "SESSION_ABSOLUTE_TTL_SECONDS": "2592000",
@@ -107,7 +110,7 @@ def main() -> int:
         "SESSION_COOKIE_SECURE": "false",
         "SESSION_ALLOWED_ORIGINS": "http://localhost:3000,http://localhost:4000,http://localhost:8080",
     }
-    assert_migration_contract(render_compose(), defaults)
+    assert_migration_contract(render_compose(defaults), defaults)
     assert_migration_contract(render_compose(CUSTOM_ENVIRONMENT), CUSTOM_ENVIRONMENT)
     print("COMPOSE_DEPLOYMENT_CONTRACT_PASS")
     return 0
