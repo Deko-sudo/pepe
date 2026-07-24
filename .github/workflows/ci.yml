@@ -78,6 +78,7 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: alembic upgrade head
       - run: alembic current
+      - run: PEPE_RUN_POSTGRES_INTEGRATION=1 pytest tests/test_session_concurrency_postgres.py -q
       - run: alembic downgrade 002
       - run: alembic upgrade head
 

@@ -56,8 +56,11 @@ async def get_active_session_by_token(
     token: str,
     *,
     now: datetime,
+    lock_for_update: bool = False,
 ) -> UserSession | None:
     statement = select(UserSession).where(UserSession.token_digest == digest_session_token(token))
+    if lock_for_update:
+        statement = statement.with_for_update()
     result = await db.execute(statement)
     session = result.scalar_one_or_none()
     if session is None or not is_active_session(
@@ -135,17 +138,21 @@ async def resolve_authenticated_session(
 ) -> AuthenticatedSession | None:
     if not token:
         return None
-    session = await get_active_session_by_token(db, token, now=now)
+    session = await get_active_session_by_token(db, token, now=now, lock_for_update=True)
     if session is None:
         return None
     user = await db.get(User, session.user_id)
     if user is None:
         return None
-    session.last_seen_at = now
-    session.idle_expires_at = clamp_idle_expiry(
+    session.last_seen_at = max(session.last_seen_at, now)
+    candidate_idle_expiry = clamp_idle_expiry(
         now=now,
         absolute_expiry=session.expires_at,
         idle_ttl_seconds=idle_ttl_seconds,
+    )
+    session.idle_expires_at = min(
+        max(session.idle_expires_at, candidate_idle_expiry),
+        session.expires_at,
     )
     return AuthenticatedSession(user=user, session=session)
 
@@ -156,6 +163,7 @@ async def revoke_all_active_sessions(
     *,
     now: datetime,
 ) -> None:
+    await db.execute(select(User.id).where(User.id == user_id).with_for_update())
     statement = select(UserSession).where(
         UserSession.user_id == user_id,
         UserSession.revoked_at.is_(None),
