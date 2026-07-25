@@ -1,5 +1,6 @@
 # Disposable Stage 6 worker integration dependencies.
-# Start: docker compose -p pepe-stage6-it -f docker-compose.integration.yml up -d --build
+# Start: docker compose -p pepe-stage6-it -f docker-compose.integration.yml up -d --build && \
+#        docker compose -p pepe-stage6-it -f docker-compose.integration.yml wait migrate
 # Test:  TEST_DATABASE_URL=postgresql+asyncpg://pepe_stage6:pepe_stage6@localhost:55432/pepe_stage6 \
 #        TEST_REDIS_URL=redis://localhost:56379/0 apps/worker/.venv/bin/python -m pytest apps/worker/tests/test_quote_refresh_integration.py -q
 # Stop:  docker compose -p pepe-stage6-it -f docker-compose.integration.yml down

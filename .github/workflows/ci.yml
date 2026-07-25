@@ -41,7 +41,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - run: pip install -e ".[dev]"
+      - run: pip install -e ../../packages/quote-core && pip install -e ".[dev]"
       - run: ruff check .
       - run: mypy .
       - run: pytest
@@ -97,7 +97,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - run: pip install -e ".[dev]"
+      - run: pip install -e ../../packages/quote-core && pip install -e ".[dev]"
       - run: alembic upgrade head
       - run: alembic current | grep -F "005 (head)"
       - run: python ../../scripts/verify_asset_catalog_migration.py
@@ -138,7 +138,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - run: pip install -e ".[dev]"
+      - run: pip install -e ../../packages/quote-core && pip install -e ".[dev]"
       - run: ruff check .
       - run: mypy .
       - run: pytest
@@ -186,12 +186,15 @@ jobs:
         with:
           python-version: "3.12"
 
-      - run: pip install -e "../../packages/quote-core" -e "../api" -e ".[dev]"
+      - name: Install migration dependencies
+        run: pip install -e ../../packages/quote-core -e ../api
       - name: Apply database migrations
         working-directory: apps/api
         env:
           DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
         run: alembic upgrade head
+      - name: Install worker dependencies without an app-package collision
+        run: pip uninstall -y pepe-api && pip install -e ../../packages/quote-core -e ".[dev]"
       - name: Run Stage 6 worker integration tests
         run: pytest tests/test_quote_refresh_integration.py -q
 
@@ -210,7 +213,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ci-stage4-test-bot-token
         run: |
           set -euo pipefail
-          docker compose down -v --remove-orphans
+          docker compose down --remove-orphans
           docker compose build
           docker compose up -d api
 
@@ -289,4 +292,4 @@ jobs:
           ! docker compose logs --no-color | grep -E 'pepe_session=|Set-Cookie|token_digest'
       - name: Clean Compose smoke resources
         if: always()
-        run: docker compose down -v --remove-orphans
+        run: docker compose down --remove-orphans
