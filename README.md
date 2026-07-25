@@ -240,6 +240,10 @@ services, applies `alembic upgrade head`, and runs
 `TEST_REDIS_URL`. These variables make the environment-gated worker integration tests run
 rather than skip.
 
+Current-quote provenance is persisted with each durable latest quote and encoded in the unchanged
+Redis v1 payload. PostgreSQL fallback therefore returns the same nested provenance object as a
+cache hit; provider labels originate from normalized provider output, not API configuration.
+
 ## Структура монорепозитория
 
 ```
