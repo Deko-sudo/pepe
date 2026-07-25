@@ -139,8 +139,8 @@ def _response_from_quote(
         market_type=MarketType(quote.market_type),
         price_type=PriceType(quote.price_type),
         delay_class=DelayClass(quote.delay_class),
-        source_label=settings.quote_source_label,
-        venue_label=settings.quote_venue_label or None,
+        source_label=quote.source_label,
+        venue_label=quote.source_venue,
     )
     return _apply_freshness(response, instrument.asset_class, now)
 

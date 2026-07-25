@@ -52,6 +52,7 @@ class LatestMarketQuote(Base):
     )
     provider_key: Mapped[str] = mapped_column(String(64), nullable=False)
     provider_instrument_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    source_label: Mapped[str] = mapped_column(String(128), nullable=False)
     source_venue: Mapped[str | None] = mapped_column(String(128), nullable=True)
     market_type: Mapped[str] = mapped_column(String(32), nullable=False)
     price_type: Mapped[str] = mapped_column(String(32), nullable=False)

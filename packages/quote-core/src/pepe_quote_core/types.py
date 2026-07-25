@@ -98,6 +98,7 @@ class NormalizedQuote:
     provider_key: str
     provider_mapping_id: uuid.UUID
     provider_instrument_id: str | None
+    source_label: str
     source_venue: str | None
     market_type: MarketType
     price_type: PriceType
@@ -126,6 +127,8 @@ class NormalizedQuote:
     provider_event_id: str | None
 
     def __post_init__(self) -> None:
+        if not self.source_label:
+            raise ValueError("source_label must not be empty")
         _validate_positive("price", self.price)
         _validate_optional_positive("bid", self.bid)
         _validate_optional_positive("ask", self.ask)
@@ -170,7 +173,7 @@ class NormalizedQuote:
     @property
     def provenance(self) -> PublicProvenance:
         return PublicProvenance(
-            source_label="Synthetic test source",
+            source_label=self.source_label,
             venue_label=self.source_venue,
             market_type=self.market_type,
             price_type=self.price_type,

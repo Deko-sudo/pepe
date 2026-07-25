@@ -142,7 +142,8 @@ def make_durable_quote() -> SimpleNamespace:
         low_24h=Decimal("58000.00"), change_24h=Decimal("1000.00"),
         change_percent_24h=Decimal("1.69"), base_volume_24h=Decimal("12.50"),
         quote_volume_24h=Decimal("750000.00"), market_status="open", observed_at=NOW,
-        received_at=NOW, market_type="spot", price_type="last_trade", delay_class="realtime",
+        received_at=NOW, source_label="Synthetic test source", source_venue="Synthetic test venue",
+        market_type="spot", price_type="last_trade", delay_class="realtime",
     )
 
 

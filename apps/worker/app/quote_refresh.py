@@ -48,20 +48,21 @@ class AsyncpgQuoteUnitOfWork:
             """
             INSERT INTO latest_market_quotes (
                 instrument_id, provider_mapping_id, provider_key, provider_instrument_id,
-                source_venue, market_type, price_type, price, bid, ask, mid,
+                source_label, source_venue, market_type, price_type, price, bid, ask, mid,
                 open_24h, high_24h, low_24h, change_24h, change_percent_24h,
                 base_volume_24h, quote_volume_24h,
                 provider_timestamp, observed_at, received_at, data_delay_seconds,
                 market_status, delay_class, mapping_version, schema_version, provider_event_id
             ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-                $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23,
-                $24, $25, $26, $27
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+                $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24,
+                $25, $26, $27, $28
             )
             ON CONFLICT (instrument_id) DO UPDATE SET
                 provider_mapping_id = EXCLUDED.provider_mapping_id,
                 provider_key = EXCLUDED.provider_key,
                 provider_instrument_id = EXCLUDED.provider_instrument_id,
+                source_label = EXCLUDED.source_label,
                 source_venue = EXCLUDED.source_venue,
                 market_type = EXCLUDED.market_type,
                 price_type = EXCLUDED.price_type,
@@ -111,6 +112,7 @@ class AsyncpgQuoteUnitOfWork:
             quote.provider_mapping_id,
             quote.provider_key,
             quote.provider_instrument_id,
+            quote.source_label,
             quote.source_venue,
             quote.market_type.value,
             quote.price_type.value,

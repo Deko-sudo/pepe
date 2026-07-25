@@ -44,3 +44,5 @@ async def test_fake_provider_returns_a_valid_deterministic_quote() -> None:
     assert result.market_status is MarketStatus.OPEN
     assert result.data_status is DataStatus.FRESH
     assert result.delay_class is DelayClass.REALTIME
+    assert result.source_label == "Synthetic test source"
+    assert result.provenance.source_label == "Synthetic test source"

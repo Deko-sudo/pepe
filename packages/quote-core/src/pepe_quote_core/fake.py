@@ -54,6 +54,7 @@ class FakeQuoteProvider:
             provider_key=request.provider_key,
             provider_mapping_id=request.provider_mapping_id,
             provider_instrument_id=request.provider_instrument_id,
+            source_label="Synthetic test source",
             source_venue="Synthetic test venue",
             market_type=MarketType.SPOT,
             price_type=PriceType.LAST_TRADE,
