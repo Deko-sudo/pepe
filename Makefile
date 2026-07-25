@@ -23,24 +23,28 @@ ps: ## Show running containers
 
 test: ## Run all tests
 	cd apps/mini-app && npm test
+	cd packages/quote-core && ../../apps/api/.venv/bin/python -m pytest
 	cd apps/api && .venv/bin/python -m pytest
 	cd apps/bot && .venv/bin/python -m pytest
 	cd apps/worker && .venv/bin/python -m pytest
 
 lint: ## Run linters
 	cd apps/mini-app && npm run lint
+	cd packages/quote-core && ../../apps/api/.venv/bin/ruff check .
 	cd apps/api && .venv/bin/ruff check .
 	cd apps/bot && .venv/bin/ruff check .
 	cd apps/worker && .venv/bin/ruff check .
 
 format: ## Format code
 	cd apps/mini-app && npm run lint -- --fix
+	cd packages/quote-core && ../../apps/api/.venv/bin/ruff format .
 	cd apps/api && .venv/bin/ruff format .
 	cd apps/bot && .venv/bin/ruff format .
 	cd apps/worker && .venv/bin/ruff format .
 
 typecheck: ## Run type checkers
 	cd apps/mini-app && npm run typecheck
+	cd packages/quote-core && ../../apps/api/.venv/bin/mypy src tests
 	cd apps/api && .venv/bin/mypy .
 	cd apps/bot && .venv/bin/mypy .
 	cd apps/worker && .venv/bin/mypy .

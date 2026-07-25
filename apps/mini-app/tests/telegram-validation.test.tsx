@@ -73,8 +73,8 @@ describe("Telegram session bootstrap", () => {
 
     renderProvider();
 
-    await waitFor(() => expect(screen.getByTestId("state")).toHaveTextContent("valid"));
-    expect(screen.getByTestId("user")).toHaveTextContent("Test");
+    await waitFor(() => expect(screen.getByTestId("user")).toHaveTextContent("Test"));
+    expect(screen.getByTestId("state")).toHaveTextContent("valid");
   });
 
   it("shows unavailable state on exchange 503 response with HTML body", async () => {

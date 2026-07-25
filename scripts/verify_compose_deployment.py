@@ -85,6 +85,13 @@ def assert_migration_contract(rendered: dict[str, Any], expected_environment: di
         raise AssertionError("api must wait for successful migrate completion")
     if api_dependencies.get("redis", {}).get("condition") != "service_healthy":
         raise AssertionError("api must preserve the healthy redis dependency")
+    for consumer_name in ("worker", "scheduler"):
+        consumer = services.get(consumer_name)
+        if not isinstance(consumer, dict):
+            raise AssertionError(f"Compose config must define {consumer_name}")
+        consumer_dependencies = consumer.get("depends_on", {})
+        if consumer_dependencies.get("migrate", {}).get("condition") != "service_completed_successfully":
+            raise AssertionError(f"{consumer_name} must wait for successful migrate completion")
 
     api_environment = environment_mapping(api)
     migrate_environment = environment_mapping(migrate)

@@ -5,6 +5,9 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    _synthetic_quote_source_label = "Synthetic test source"
+    _synthetic_quote_venue_label = "Synthetic test venue"
+
     app_name: str = "Pepe"
     app_slug: str = "pepe"
     version: str = "0.1.0"
@@ -15,6 +18,17 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+asyncpg://pepe:change_me@localhost:5432/pepe"
     redis_url: str = "redis://localhost:6379/0"
+    quote_cache_url: str = "redis://localhost:6379/1"
+    quote_cache_namespace: str = "pepe:quotes:v1"
+    quote_cache_ttl_seconds: int = 60
+    quote_fake_provider_enabled: bool = False
+    quote_source_label: str = _synthetic_quote_source_label
+    quote_venue_label: str = _synthetic_quote_venue_label
+    quote_crypto_stale_after_seconds: int = 60
+    quote_crypto_hard_expire_after_seconds: int = 300
+    quote_reference_stale_after_seconds: int = 300
+    quote_reference_hard_expire_after_seconds: int = 900
+    quote_api_batch_limit: int = 20
     telegram_bot_token: str = ""
     mini_app_url: str = "http://localhost"
     telegram_init_data_max_age_seconds: int = 3600
@@ -60,6 +74,27 @@ class Settings(BaseSettings):
             raise ValueError("session_cookie_secure must be true in production")
         if self.environment == "production" and not self.session_origins:
             raise ValueError("session_allowed_origins must not be empty in production")
+        if self.environment == "production" and self.quote_fake_provider_enabled:
+            raise ValueError("quote_fake_provider_enabled must be false in production")
+        if self.environment == "production" and (
+            not self.quote_source_label.strip()
+            or self.quote_source_label == self._synthetic_quote_source_label
+            or self.quote_venue_label == self._synthetic_quote_venue_label
+        ):
+            raise ValueError("production quote labels must not use synthetic placeholders")
+        if self.quote_crypto_stale_after_seconds <= 0 or (
+            self.quote_crypto_hard_expire_after_seconds <= self.quote_crypto_stale_after_seconds
+        ):
+            raise ValueError("crypto quote freshness thresholds are invalid")
+        if self.quote_reference_stale_after_seconds <= 0 or (
+            self.quote_reference_hard_expire_after_seconds
+            <= self.quote_reference_stale_after_seconds
+        ):
+            raise ValueError("reference quote freshness thresholds are invalid")
+        if not 1 <= self.quote_api_batch_limit <= 100:
+            raise ValueError("quote_api_batch_limit must be between 1 and 100")
+        if self.quote_cache_ttl_seconds <= 0:
+            raise ValueError("quote_cache_ttl_seconds must be positive")
 
         for origin in self.session_origins:
             try:
@@ -84,6 +119,17 @@ class Settings(BaseSettings):
         if not set(self.session_origins).issubset(self.cors_origins):
             raise ValueError("session_allowed_origins must be included in cors_allowed_origins")
         return self
+
+    def quote_freshness_for(self, asset_class: str) -> tuple[int, int]:
+        if asset_class == "crypto_spot":
+            return (
+                self.quote_crypto_stale_after_seconds,
+                self.quote_crypto_hard_expire_after_seconds,
+            )
+        return (
+            self.quote_reference_stale_after_seconds,
+            self.quote_reference_hard_expire_after_seconds,
+        )
 
 
 settings = Settings()

@@ -41,9 +41,31 @@ jobs:
         with:
           python-version: "3.12"
 
-      - run: pip install -e ".[dev]"
+      - run: pip install -e ../../packages/quote-core && pip install -e ".[dev]"
       - run: ruff check .
       - run: mypy .
+      - run: pytest
+
+  quote-core:
+    name: Quote Core
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: packages/quote-core
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: mypy src tests
       - run: pytest
 
   migration:
@@ -79,14 +101,13 @@ jobs:
         with:
           python-version: "3.12"
 
-      - run: pip install -e ".[dev]"
+      - run: pip install -e ../../packages/quote-core && pip install -e ".[dev]"
       - run: alembic upgrade head
-      - run: alembic current | grep -F "004 (head)"
+      - run: alembic current | grep -F "006 (head)"
       - run: python ../../scripts/verify_asset_catalog_migration.py
       - run: PEPE_RUN_POSTGRES_INTEGRATION=1 pytest tests/test_session_concurrency_postgres.py -q
-      - run: alembic downgrade 003
-      - run: alembic current | grep -F "003"
-      - run: python ../../scripts/verify_asset_catalog_migration.py --absent
+      - run: alembic downgrade 004
+      - run: alembic current | grep -F "004"
       - run: alembic upgrade head
       - run: python ../../scripts/verify_asset_catalog_migration.py
 
@@ -121,15 +142,70 @@ jobs:
         with:
           python-version: "3.12"
 
-      - run: pip install -e ".[dev]"
+      - run: pip install -e ../../packages/quote-core && pip install -e ".[dev]"
       - run: ruff check .
       - run: mypy .
       - run: pytest
 
+  worker-integration:
+    name: Worker integration
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: apps/worker
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: pepe_stage6
+          POSTGRES_USER: pepe_stage6
+          POSTGRES_PASSWORD: pepe_stage6
+        options: >-
+          --health-cmd "pg_isready -U pepe_stage6 -d pepe_stage6"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    env:
+      TEST_DATABASE_URL: postgresql+asyncpg://pepe_stage6:pepe_stage6@localhost:5432/pepe_stage6
+      TEST_REDIS_URL: redis://localhost:6379/0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install migration dependencies
+        run: pip install -e ../../packages/quote-core -e ../api
+      - name: Apply database migrations
+        working-directory: apps/api
+        env:
+          DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
+        run: alembic upgrade head
+      - name: Install worker dependencies without an app-package collision
+        run: pip uninstall -y pepe-api && pip install -e ../../packages/quote-core -e ".[dev]"
+      - name: Run Stage 6 worker integration tests
+        run: pytest tests/test_quote_refresh_integration.py -q
+
   docker:
     name: Docker
     runs-on: ubuntu-latest
-    needs: [frontend, api, migration, bot, worker]
+    needs: [frontend, api, quote-core, migration, bot, worker]
     steps:
       - uses: actions/checkout@v4
       - name: Validate Docker Compose
@@ -141,7 +217,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ci-stage4-test-bot-token
         run: |
           set -euo pipefail
-          docker compose down -v --remove-orphans
+          docker compose down --remove-orphans
           docker compose build
           docker compose up -d api
 
@@ -164,7 +240,7 @@ jobs:
             sleep 2
           done
           curl --fail --silent --show-error http://localhost:8100/api/v1/health >/dev/null
-          docker compose exec -T api alembic current | grep -F "004 (head)"
+          docker compose exec -T api alembic current | grep -F "006 (head)"
           test "$(
             docker compose exec -T postgres psql -U pepe -d pepe -tAc \
               "SELECT to_regclass('public.user_sessions') IS NOT NULL"
@@ -173,6 +249,10 @@ jobs:
             docker compose exec -T postgres psql -U pepe -d pepe -tAc \
               "SELECT count(*) FROM asset_instruments WHERE is_enabled"
           )" = "3"
+          test "$(
+            docker compose exec -T postgres psql -U pepe -d pepe -tAc \
+              "SELECT to_regclass('public.latest_market_quotes') IS NOT NULL"
+          )" = "t"
 
           python - <<'PY' >/tmp/pepe-session-payload.json
           import hashlib
@@ -216,4 +296,4 @@ jobs:
           ! docker compose logs --no-color | grep -E 'pepe_session=|Set-Cookie|token_digest'
       - name: Clean Compose smoke resources
         if: always()
-        run: docker compose down -v --remove-orphans
+        run: docker compose down --remove-orphans

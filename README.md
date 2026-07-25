@@ -232,6 +232,18 @@ cd apps/bot && pytest
 cd apps/worker && pytest
 ```
 
+### Worker integration CI (Stage 6)
+
+GitHub Actions job `Worker integration` starts disposable PostgreSQL 16 and Redis 7
+services, applies `alembic upgrade head`, and runs
+`apps/worker/tests/test_quote_refresh_integration.py` with `TEST_DATABASE_URL` and
+`TEST_REDIS_URL`. These variables make the environment-gated worker integration tests run
+rather than skip.
+
+Current-quote provenance is persisted with each durable latest quote and encoded in the unchanged
+Redis v1 payload. PostgreSQL fallback therefore returns the same nested provenance object as a
+cache hit; provider labels originate from normalized provider output, not API configuration.
+
 ## Структура монорепозитория
 
 ```

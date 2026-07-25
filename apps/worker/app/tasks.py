@@ -1,6 +1,10 @@
 import logging
 
+import asyncpg
+from redis.exceptions import RedisError
+
 from app.celery_app import celery_app
+from app.quote_refresh import run_refresh_fake_quotes
 
 logger = logging.getLogger(__name__)
 
@@ -24,3 +28,14 @@ def run_test_task(value: str = "test") -> dict[str, str]:
         "status": "ok",
         "value": value,
     }
+
+
+@celery_app.task(
+    name="quote.refresh",
+    autoretry_for=(OSError, asyncpg.PostgresError, RedisError),
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+)
+def refresh_quotes() -> dict[str, int | str]:
+    return run_refresh_fake_quotes()

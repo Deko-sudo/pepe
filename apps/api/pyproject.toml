@@ -19,7 +19,11 @@ dependencies = [
     "redis[hiredis]>=5.1.0",
     "httpx>=0.27.0",
     "structlog>=24.4.0",
+    "pepe-quote-core",
 ]
+
+[tool.uv.sources]
+pepe-quote-core = { path = "../../packages/quote-core", editable = true }
 
 [project.optional-dependencies]
 dev = [
@@ -32,6 +36,7 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
+
 
 [tool.ruff]
 target-version = "py312"
