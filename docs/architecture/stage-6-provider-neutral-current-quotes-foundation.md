@@ -47,7 +47,7 @@ does not persist credentials.
 - `GET /api/v1/assets/{slug}/quote`
 - `GET /api/v1/assets/quotes?slug=btc-usdt&slug=eth-usdt`
 
-Both reuse the Stage-4 session dependency. They return `Cache-Control: private, no-store`. A fresh or stale durable value returns `200` with explicit `data_status` and `age_seconds`; a hard-expired or absent value returns generic `503`. Unknown and disabled records are not disclosed through provider diagnostics. Batch ordering is canonical slug order and duplicate requested slugs are deduplicated.
+Both reuse the Stage-4 session dependency. They return `Cache-Control: private, no-store`. A fresh or stale durable value returns `200` with explicit `data_status` and `age_seconds`. For the single-asset endpoint, a hard-expired or absent value returns generic `503`; batch requests return `200` with unavailable slugs. Unknown and disabled records are not disclosed through provider diagnostics. Batch ordering is canonical slug order and duplicate requested slugs are deduplicated.
 
 Public provenance exposes only safe labels, market type, price type and delay class. Provider key, mapping ID/version, provider symbol, URL, raw payload, failure diagnostics and credentials never appear in responses.
 

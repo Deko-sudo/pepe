@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Protocol
 
@@ -23,11 +24,24 @@ class QuoteCache(Protocol):
     async def close(self) -> None: ...
 
 
+@dataclass(frozen=True)
+class CurrentQuoteResolution:
+    quote: CurrentQuoteResponse | None
+    not_found: bool
+
+
 class CurrentQuoteService:
-    """Resolve current quotes with an injectable best-effort cache adapter."""
+    """Resolve current quotes with a request-scoped best-effort cache adapter."""
 
     def __init__(self, *, cache: QuoteCache | None = None) -> None:
         self._cache = cache
+        self._owns_cache = cache is None
+
+    async def close(self) -> None:
+        """Close only the cache this service created for the request."""
+        if self._owns_cache and self._cache is not None:
+            await self._cache.close()
+            self._cache = None
 
     async def get_current_quote_by_slug(
         self,
@@ -36,24 +50,34 @@ class CurrentQuoteService:
         *,
         now: datetime | None = None,
     ) -> CurrentQuoteResponse | None:
+        return (await self.resolve_current_quote_by_slug(db, slug, now=now)).quote
+
+    async def resolve_current_quote_by_slug(
+        self,
+        db: AsyncSession,
+        slug: str,
+        *,
+        now: datetime | None = None,
+    ) -> CurrentQuoteResolution:
         instrument = await _get_enabled_instrument(db, slug)
         if instrument is None:
-            return None
+            return CurrentQuoteResolution(quote=None, not_found=True)
         current_time = now or datetime.now(UTC)
-        cache = self._cache or CurrentQuoteCache()
-        try:
-            cached = await cache.get(instrument.id)
-            if cached is not None:
-                return _apply_freshness(cached, instrument.asset_class, current_time)
-            quote = await _get_durable_quote(db, instrument.id)
-            if quote is None:
-                return None
-            response = _response_from_quote(instrument, quote, current_time)
-            if response is not None:
-                await cache.set(instrument.id, response)
-            return response
-        finally:
-            await cache.close()
+        if self._cache is None:
+            self._cache = CurrentQuoteCache()
+        cached = await self._cache.get(instrument.id)
+        if cached is not None:
+            return CurrentQuoteResolution(
+                quote=_apply_freshness(cached, instrument.asset_class, current_time),
+                not_found=False,
+            )
+        quote = await _get_durable_quote(db, instrument.id)
+        if quote is None:
+            return CurrentQuoteResolution(quote=None, not_found=False)
+        response = _response_from_quote(instrument, quote, current_time)
+        if response is not None:
+            await self._cache.set(instrument.id, response)
+        return CurrentQuoteResolution(quote=response, not_found=False)
 
 
 async def get_current_quote_by_slug(
@@ -62,7 +86,11 @@ async def get_current_quote_by_slug(
     *,
     now: datetime | None = None,
 ) -> CurrentQuoteResponse | None:
-    return await CurrentQuoteService().get_current_quote_by_slug(db, slug, now=now)
+    service = CurrentQuoteService()
+    try:
+        return await service.get_current_quote_by_slug(db, slug, now=now)
+    finally:
+        await service.close()
 
 
 async def _get_enabled_instrument(db: AsyncSession, slug: str) -> AssetInstrument | None:

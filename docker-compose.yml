@@ -100,6 +100,8 @@ services:
       - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://pepe:change_me@postgres:5432/pepe}
       - QUOTE_FAKE_PROVIDER_ENABLED=${QUOTE_FAKE_PROVIDER_ENABLED:-true}
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       postgres:
@@ -125,6 +127,8 @@ services:
       - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://pepe:change_me@postgres:5432/pepe}
       - QUOTE_FAKE_PROVIDER_ENABLED=${QUOTE_FAKE_PROVIDER_ENABLED:-true}
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       postgres:

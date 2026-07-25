@@ -82,10 +82,35 @@ def test_settings_accepts_secure_normalized_production_environment() -> None:
         session_cookie_secure=True,
         cors_allowed_origins="https://mini.pepe.example",
         session_allowed_origins="https://mini.pepe.example",
+        quote_source_label="Reviewed production source",
+        quote_venue_label="Reviewed production venue",
     )
 
     assert settings.environment == "production"
     assert settings.session_origins == ("https://mini.pepe.example",)
+
+
+@pytest.mark.parametrize(
+    ("quote_source_label", "quote_venue_label"),
+    [
+        ("Synthetic test source", "Reviewed production venue"),
+        ("Reviewed production source", "Synthetic test venue"),
+        ("", "Reviewed production venue"),
+    ],
+)
+def test_settings_rejects_placeholder_quote_labels_in_production(
+    quote_source_label: str,
+    quote_venue_label: str,
+) -> None:
+    with pytest.raises(ValueError, match="production quote labels"):
+        Settings(
+            environment="production",
+            session_cookie_secure=True,
+            cors_allowed_origins="https://mini.pepe.example",
+            session_allowed_origins="https://mini.pepe.example",
+            quote_source_label=quote_source_label,
+            quote_venue_label=quote_venue_label,
+        )
 
 
 def test_settings_accepts_insecure_development_environment() -> None:

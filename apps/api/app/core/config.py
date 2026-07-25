@@ -5,6 +5,9 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    _synthetic_quote_source_label = "Synthetic test source"
+    _synthetic_quote_venue_label = "Synthetic test venue"
+
     app_name: str = "Pepe"
     app_slug: str = "pepe"
     version: str = "0.1.0"
@@ -19,8 +22,8 @@ class Settings(BaseSettings):
     quote_cache_namespace: str = "pepe:quotes:v1"
     quote_cache_ttl_seconds: int = 60
     quote_fake_provider_enabled: bool = False
-    quote_source_label: str = "Synthetic test source"
-    quote_venue_label: str = "Synthetic test venue"
+    quote_source_label: str = _synthetic_quote_source_label
+    quote_venue_label: str = _synthetic_quote_venue_label
     quote_crypto_stale_after_seconds: int = 60
     quote_crypto_hard_expire_after_seconds: int = 300
     quote_reference_stale_after_seconds: int = 300
@@ -73,6 +76,12 @@ class Settings(BaseSettings):
             raise ValueError("session_allowed_origins must not be empty in production")
         if self.environment == "production" and self.quote_fake_provider_enabled:
             raise ValueError("quote_fake_provider_enabled must be false in production")
+        if self.environment == "production" and (
+            not self.quote_source_label.strip()
+            or self.quote_source_label == self._synthetic_quote_source_label
+            or self.quote_venue_label == self._synthetic_quote_venue_label
+        ):
+            raise ValueError("production quote labels must not use synthetic placeholders")
         if self.quote_crypto_stale_after_seconds <= 0 or (
             self.quote_crypto_hard_expire_after_seconds <= self.quote_crypto_stale_after_seconds
         ):

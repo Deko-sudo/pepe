@@ -159,36 +159,47 @@ async def refresh_fake_quotes() -> dict[str, int | str]:
     if not worker_settings.quote_fake_provider_enabled:
         return {"status": "disabled", "refreshed": 0}
 
-    connection = await asyncpg.connect(worker_settings.database_url.replace("+asyncpg", ""))
-    redis = redis_asyncio.from_url(worker_settings.quote_cache_url, decode_responses=True)
+    connection = await asyncpg.connect(
+        worker_settings.database_url.replace("+asyncpg", ""),
+        timeout=10,
+        command_timeout=10,
+    )
     try:
-        await _ensure_fake_mappings(connection)
-        targets = await _load_fake_targets(connection)
-        now = datetime.now(UTC)
-        store = QuoteRedisStore(
-            redis,
-            cache_namespace=worker_settings.quote_cache_namespace,
-            cache_ttl_seconds=worker_settings.quote_cache_ttl_seconds,
-            lease_ttl_seconds=worker_settings.quote_refresh_lease_ttl_seconds,
+        redis = redis_asyncio.from_url(
+            worker_settings.quote_cache_url,
+            decode_responses=True,
+            socket_connect_timeout=5,
+            socket_timeout=5,
         )
-        service = QuoteRefreshService(
-            leases=store,
-            provider=FakeQuoteProvider(clock=lambda: now),
-            unit_of_work_factory=AsyncpgQuoteUnitOfWorkFactory(connection),
-            cache=RedisQuoteCache(store),
-        )
-        results = await service.refresh_many(targets)
-        retryable = [result for result in results if isinstance(result, RefreshRetryable)]
-        if retryable:
-            reasons = ", ".join(sorted({result.reason.value for result in retryable}))
-            raise OSError(f"quote refresh retryable failures: {reasons}")
-        return {
-            "status": "ok",
-            "refreshed": sum(isinstance(result, RefreshSuccess) for result in results),
-            "skipped": sum(isinstance(result, RefreshSkipped) for result in results),
-        }
+        try:
+            await _ensure_fake_mappings(connection)
+            targets = await _load_fake_targets(connection)
+            now = datetime.now(UTC)
+            store = QuoteRedisStore(
+                redis,
+                cache_namespace=worker_settings.quote_cache_namespace,
+                cache_ttl_seconds=worker_settings.quote_cache_ttl_seconds,
+                lease_ttl_seconds=worker_settings.quote_refresh_lease_ttl_seconds,
+            )
+            service = QuoteRefreshService(
+                leases=store,
+                provider=FakeQuoteProvider(clock=lambda: now),
+                unit_of_work_factory=AsyncpgQuoteUnitOfWorkFactory(connection),
+                cache=RedisQuoteCache(store),
+            )
+            results = await service.refresh_many(targets)
+            retryable = [result for result in results if isinstance(result, RefreshRetryable)]
+            if retryable:
+                reasons = ", ".join(sorted({result.reason.value for result in retryable}))
+                raise OSError(f"quote refresh retryable failures: {reasons}")
+            return {
+                "status": "ok",
+                "refreshed": sum(isinstance(result, RefreshSuccess) for result in results),
+                "skipped": sum(isinstance(result, RefreshSkipped) for result in results),
+            }
+        finally:
+            await redis.aclose()
     finally:
-        await redis.aclose()
         await connection.close()
 
 

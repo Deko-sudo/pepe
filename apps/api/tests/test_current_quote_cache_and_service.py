@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from types import SimpleNamespace
 from typing import Any, cast
+from unittest.mock import patch
 
 import pytest
 from pepe_quote_core import (
@@ -212,7 +213,7 @@ async def test_service_cache_hit_avoids_the_durable_quote_database_query() -> No
     assert len(db.calls) == 1
     assert cache.get_calls == [INSTRUMENT_ID]
     assert cache.set_calls == []
-    assert cache.closed is True
+    assert cache.closed is False
 
 
 @pytest.mark.asyncio
@@ -229,6 +230,28 @@ async def test_service_cache_miss_falls_back_to_durable_quote_and_restores_cache
     assert result == make_response()
     assert len(db.calls) == 2
     assert cache.set_calls == [(INSTRUMENT_ID, make_response())]
+    assert cache.closed is False
+
+
+@pytest.mark.asyncio
+async def test_service_reuses_and_closes_one_owned_cache_for_multiple_resolutions() -> None:
+    cache = FakeCache(None)
+    db = FakeDatabase(
+        make_instrument(),
+        make_durable_quote(),
+        make_instrument(),
+        make_durable_quote(),
+    )
+
+    with patch("app.modules.market_data.quotes.CurrentQuoteCache", return_value=cache) as factory:
+        service = CurrentQuoteService()
+        first = await service.get_current_quote_by_slug(cast(Any, db), "btc-usdt", now=NOW)
+        second = await service.get_current_quote_by_slug(cast(Any, db), "btc-usdt", now=NOW)
+        await service.close()
+
+    assert first == make_response()
+    assert second == make_response()
+    assert factory.call_count == 1
     assert cache.closed is True
 
 

@@ -11,7 +11,7 @@ class WorkerSettings(BaseSettings):
     database_url: str = "postgresql+asyncpg://pepe:change_me@localhost:5432/pepe"
     quote_queue_name: str = "quotes"
     quote_fake_provider_enabled: bool = False
-    quote_scheduler_interval_seconds: int = 60
+    quote_scheduler_interval_seconds: int = Field(default=60, gt=0)
     log_level: str = "INFO"
 
     model_config = {"env_file": ".env", "extra": "ignore"}
