@@ -60,9 +60,10 @@ class FakeUnitOfWork:
         self.events = events
         self.fail_commit = fail_commit
 
-    async def upsert(self, quote: NormalizedQuote) -> None:
+    async def upsert(self, quote: NormalizedQuote) -> bool:
         del quote
         self.events.append("upsert")
+        return True
 
     async def commit(self) -> None:
         self.events.append("commit")

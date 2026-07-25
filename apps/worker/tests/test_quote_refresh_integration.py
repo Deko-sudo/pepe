@@ -114,8 +114,8 @@ class CommitFailingUnitOfWork:
     def __init__(self, inner: QuoteUnitOfWork) -> None:
         self._inner = inner
 
-    async def upsert(self, quote: NormalizedQuote) -> None:
-        await self._inner.upsert(quote)
+    async def upsert(self, quote: NormalizedQuote) -> bool:
+        return await self._inner.upsert(quote)
 
     async def commit(self) -> None:
         raise OSError("injected commit failure")

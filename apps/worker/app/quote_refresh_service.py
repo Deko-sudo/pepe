@@ -27,7 +27,7 @@ class QuoteProvider(Protocol):
 class QuoteUnitOfWork(Protocol):
     """A transaction that makes persistence atomic before cache publication."""
 
-    async def upsert(self, quote: NormalizedQuote) -> None: ...
+    async def upsert(self, quote: NormalizedQuote) -> bool: ...
 
     async def commit(self) -> None: ...
 
@@ -131,7 +131,7 @@ class QuoteRefreshService:
             unit_of_work: QuoteUnitOfWork | None = None
             try:
                 unit_of_work = await self._unit_of_work_factory.create()
-                await unit_of_work.upsert(quote)
+                accepted = await unit_of_work.upsert(quote)
                 await unit_of_work.commit()
             except Exception:
                 if unit_of_work is not None:
@@ -140,6 +140,9 @@ class QuoteRefreshService:
                     except Exception:
                         logger.warning("quote refresh rollback failed", exc_info=True)
                 return RefreshRetryable(target.instrument_id, RetryReason.PERSISTENCE_FAILED)
+
+            if not accepted:
+                return RefreshSuccess(target.instrument_id, cache_written=False)
 
             try:
                 await self._cache.set_cached_quote(quote)

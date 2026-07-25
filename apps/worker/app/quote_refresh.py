@@ -43,17 +43,20 @@ class AsyncpgQuoteUnitOfWork:
         self._connection = connection
         self._transaction = transaction
 
-    async def upsert(self, quote: NormalizedQuote) -> None:
-        await self._connection.execute(
+    async def upsert(self, quote: NormalizedQuote) -> bool:
+        command_tag = await self._connection.execute(
             """
             INSERT INTO latest_market_quotes (
                 instrument_id, provider_mapping_id, provider_key, provider_instrument_id,
                 source_venue, market_type, price_type, price, bid, ask, mid,
+                open_24h, high_24h, low_24h, change_24h, change_percent_24h,
+                base_volume_24h, quote_volume_24h,
                 provider_timestamp, observed_at, received_at, data_delay_seconds,
                 market_status, delay_class, mapping_version, schema_version, provider_event_id
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-                $12, $13, $14, $15, $16, $17, $18, $19, $20
+                $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23,
+                $24, $25, $26, $27
             )
             ON CONFLICT (instrument_id) DO UPDATE SET
                 provider_mapping_id = EXCLUDED.provider_mapping_id,
@@ -66,6 +69,13 @@ class AsyncpgQuoteUnitOfWork:
                 bid = EXCLUDED.bid,
                 ask = EXCLUDED.ask,
                 mid = EXCLUDED.mid,
+                open_24h = EXCLUDED.open_24h,
+                high_24h = EXCLUDED.high_24h,
+                low_24h = EXCLUDED.low_24h,
+                change_24h = EXCLUDED.change_24h,
+                change_percent_24h = EXCLUDED.change_percent_24h,
+                base_volume_24h = EXCLUDED.base_volume_24h,
+                quote_volume_24h = EXCLUDED.quote_volume_24h,
                 provider_timestamp = EXCLUDED.provider_timestamp,
                 observed_at = EXCLUDED.observed_at,
                 received_at = EXCLUDED.received_at,
@@ -78,8 +88,22 @@ class AsyncpgQuoteUnitOfWork:
             WHERE EXCLUDED.observed_at > latest_market_quotes.observed_at
                OR (
                    EXCLUDED.observed_at = latest_market_quotes.observed_at
-                   AND EXCLUDED.provider_event_id > COALESCE(
-                       latest_market_quotes.provider_event_id, ''
+                   AND (
+                       EXCLUDED.mapping_version > latest_market_quotes.mapping_version
+                       OR (
+                           EXCLUDED.mapping_version = latest_market_quotes.mapping_version
+                           AND (
+                               EXCLUDED.provider_event_id > COALESCE(
+                                   latest_market_quotes.provider_event_id, ''
+                               )
+                               OR (
+                                   EXCLUDED.provider_event_id = COALESCE(
+                                       latest_market_quotes.provider_event_id, ''
+                                   )
+                                   AND EXCLUDED.provider_key > latest_market_quotes.provider_key
+                               )
+                           )
+                       )
                    )
             )
             """,
@@ -94,6 +118,13 @@ class AsyncpgQuoteUnitOfWork:
             quote.bid,
             quote.ask,
             quote.mid,
+            quote.open_24h,
+            quote.high_24h,
+            quote.low_24h,
+            quote.change_24h,
+            quote.change_percent_24h,
+            quote.base_volume_24h,
+            quote.quote_volume_24h,
             quote.provider_timestamp,
             quote.observed_at,
             quote.received_at,
@@ -104,6 +135,7 @@ class AsyncpgQuoteUnitOfWork:
             quote.schema_version,
             quote.provider_event_id,
         )
+        return str(command_tag).endswith(" 1")
 
     async def commit(self) -> None:
         await self._transaction.commit()
