@@ -25,9 +25,9 @@ The deterministic fake provider supports only canonical test scenarios for `btc-
 
 ## Persistence, cache and refresh flow
 
-Alembic `005` adds `latest_market_quotes`: one latest accepted value per canonical instrument, using the instrument UUID as primary key and restricted foreign keys to catalog and mapping records. It is not a tick store and has no append-only history. The worker's atomic upsert rejects older observations and resolves equal timestamps deterministically through the provider event identifier.
+Alembic `005` adds `latest_market_quotes`; additive Alembic `006` persists the provider provenance snapshot alongside each value. The table stores one latest accepted value per canonical instrument, using the instrument UUID as primary key and restricted foreign keys to catalog and mapping records. It is not a tick store and has no append-only history. The worker's atomic upsert rejects older observations and resolves equal timestamps deterministically through the provider event identifier.
 
-Redis is a best-effort versioned latest-value cache under `pepe:quotes:v1:<instrument-uuid>`. Cache reads are strict and corrupted/unknown payloads are misses. Redis failure falls back to PostgreSQL; it never removes the durable quote. Cache keys never contain user input, provider symbols or credentials.
+Redis is a best-effort versioned latest-value cache under `pepe:quotes:v1:<instrument-uuid>`. Cache reads are strict and corrupted/unknown payloads are misses. Redis failure falls back to PostgreSQL; it never removes the durable quote. The PostgreSQL fallback reconstructs the same v1 nested provenance object from the persisted source label, nullable venue label, market type, price type and delay class. Cache keys never contain user input, provider symbols or credentials.
 
 Celery uses the dedicated `quotes` queue and a separate scheduler service. Scheduler dispatches `quote.refresh`; the worker only runs the deterministic fake path when explicitly enabled. It seeds only non-production synthetic mappings at refresh time, then writes normalized values to durable storage. No user-facing request enqueues or forces refresh.
 
