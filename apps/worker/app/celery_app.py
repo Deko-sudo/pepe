@@ -18,6 +18,13 @@ celery_app.conf.update(
     task_acks_late=True,
     worker_prefetch_multiplier=1,
     worker_hijack_root_logger=False,
+    task_routes={"quote.refresh": {"queue": worker_settings.quote_queue_name}},
+    beat_schedule={
+        "refresh-fake-current-quotes": {
+            "task": "quote.refresh",
+            "schedule": worker_settings.quote_scheduler_interval_seconds,
+        },
+    },
 )
 
 celery_app.autodiscover_tasks(["app"])

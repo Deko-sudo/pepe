@@ -25,6 +25,7 @@ def main() -> None:
             "worker",
             "--loglevel=info",
             "--concurrency=2",
+            "--queues=celery," + worker_settings.quote_queue_name,
         ],
     )
 

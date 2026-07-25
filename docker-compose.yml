@@ -1,6 +1,6 @@
 x-api-build: &api-build
-  context: ./apps/api
-  dockerfile: Dockerfile
+  context: .
+  dockerfile: apps/api/Dockerfile
 
 x-migrate-environment: &migrate-environment
   DATABASE_URL: "${DATABASE_URL:-postgresql+asyncpg://pepe:change_me@postgres:5432/pepe}"
@@ -8,6 +8,8 @@ x-migrate-environment: &migrate-environment
 x-api-environment: &api-environment
   <<: *migrate-environment
   REDIS_URL: "${REDIS_URL:-redis://redis:6379/0}"
+  QUOTE_CACHE_URL: "${QUOTE_CACHE_URL:-redis://redis:6379/1}"
+  QUOTE_FAKE_PROVIDER_ENABLED: "${QUOTE_FAKE_PROVIDER_ENABLED:-false}"
   CORS_ALLOWED_ORIGINS: "${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:4000,http://localhost:8080}"
   APP_ENV: "${APP_ENV:-development}"
   TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN:-}"
@@ -48,7 +50,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/ready')"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -77,9 +79,6 @@ services:
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
       - MINI_APP_URL=${MINI_APP_URL:-http://localhost}
-    # Bot is either polling Telegram or idle-waiting for a token.
-    # No external ports are exposed; process liveness is the only
-    # observable signal that the container is operational.
     healthcheck:
       test: ["CMD", "python", "-c", "import os; os.kill(1, 0)"]
       interval: 10s
@@ -93,12 +92,17 @@ services:
   worker:
     container_name: pepe-worker
     build:
-      context: ./apps/worker
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/worker/Dockerfile
     environment:
       - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - QUOTE_CACHE_URL=${QUOTE_CACHE_URL:-redis://redis:6379/1}
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://pepe:change_me@postgres:5432/pepe}
+      - QUOTE_FAKE_PROVIDER_ENABLED=${QUOTE_FAKE_PROVIDER_ENABLED:-true}
     depends_on:
       redis:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "healthcheck.py"]
@@ -106,6 +110,25 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    networks:
+      - pepe-network
+
+  scheduler:
+    container_name: pepe-scheduler
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    command: ["celery", "-A", "app.celery_app", "beat", "--loglevel=info"]
+    environment:
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - QUOTE_CACHE_URL=${QUOTE_CACHE_URL:-redis://redis:6379/1}
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://pepe:change_me@postgres:5432/pepe}
+      - QUOTE_FAKE_PROVIDER_ENABLED=${QUOTE_FAKE_PROVIDER_ENABLED:-true}
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     networks:
       - pepe-network
 

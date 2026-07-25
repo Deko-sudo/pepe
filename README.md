@@ -232,6 +232,14 @@ cd apps/bot && pytest
 cd apps/worker && pytest
 ```
 
+### Worker integration CI (Stage 6)
+
+GitHub Actions job `Worker integration` starts disposable PostgreSQL 16 and Redis 7
+services, applies `alembic upgrade head`, and runs
+`apps/worker/tests/test_quote_refresh_integration.py` with `TEST_DATABASE_URL` and
+`TEST_REDIS_URL`. These variables make the environment-gated worker integration tests run
+rather than skip.
+
 ## Структура монорепозитория
 
 ```

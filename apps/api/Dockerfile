@@ -1,13 +1,16 @@
 FROM python:3.12-slim
 
-WORKDIR /app
+WORKDIR /workspace
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY . .
-RUN pip install --no-cache-dir ".[dev]"
+COPY packages/quote-core /workspace/packages/quote-core
+COPY apps/api /workspace/apps/api
+WORKDIR /workspace/apps/api
+RUN pip install --no-cache-dir /workspace/packages/quote-core \
+    && pip install --no-cache-dir ".[dev]"
 
 EXPOSE 8000
 
