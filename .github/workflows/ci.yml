@@ -103,7 +103,7 @@ jobs:
 
       - run: pip install -e ../../packages/quote-core && pip install -e ".[dev]"
       - run: alembic upgrade head
-      - run: alembic current | grep -F "005 (head)"
+      - run: alembic current | grep -F "006 (head)"
       - run: python ../../scripts/verify_asset_catalog_migration.py
       - run: PEPE_RUN_POSTGRES_INTEGRATION=1 pytest tests/test_session_concurrency_postgres.py -q
       - run: alembic downgrade 004
@@ -240,7 +240,7 @@ jobs:
             sleep 2
           done
           curl --fail --silent --show-error http://localhost:8100/api/v1/health >/dev/null
-          docker compose exec -T api alembic current | grep -F "005 (head)"
+          docker compose exec -T api alembic current | grep -F "006 (head)"
           test "$(
             docker compose exec -T postgres psql -U pepe -d pepe -tAc \
               "SELECT to_regclass('public.user_sessions') IS NOT NULL"
