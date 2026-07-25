@@ -12,6 +12,7 @@ from typing import Final
 from .types import DataStatus, DelayClass, MarketStatus, MarketType, PriceType, PublicProvenance
 
 _CACHE_SCHEMA_VERSION: Final = 1
+_MAX_DECIMAL_MAGNITUDE: Final = Decimal("100000000000000000000")
 _QUOTE_FIELDS: Final = frozenset(
     {
         "slug",
@@ -214,7 +215,7 @@ def _decimal(value: object, field: str) -> Decimal:
         parsed = Decimal(value)
     except InvalidOperation as error:
         raise CachePayloadError(f"{field} is invalid") from error
-    if not parsed.is_finite():
+    if not parsed.is_finite() or abs(parsed) > _MAX_DECIMAL_MAGNITUDE:
         raise CachePayloadError(f"{field} is invalid")
     return parsed
 

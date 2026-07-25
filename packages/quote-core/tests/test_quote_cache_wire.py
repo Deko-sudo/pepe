@@ -115,6 +115,7 @@ def test_current_quote_cache_all_invalid_input_types_raise_cache_payload_error(
     [
         (("price",), 1),
         (("price",), "NaN"),
+        (("price",), "100000000000000000001"),
         (("age_seconds",), True),
         (("observed_at",), "2026-07-25T00:00:00"),
         (("market_status",), "not-a-status"),
