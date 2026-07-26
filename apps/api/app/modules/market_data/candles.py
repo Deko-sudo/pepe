@@ -41,8 +41,10 @@ class HistoricalCandleService:
             statement = statement.where(MarketCandle.open_time < to_time)
         if from_time is None and to_time is None:
             latest = statement.order_by(MarketCandle.open_time.desc()).limit(limit).subquery()
-            statement = select(aliased(MarketCandle, latest))
-        statement = statement.order_by(MarketCandle.open_time.asc()).limit(limit)
+            latest_candle = aliased(MarketCandle, latest)
+            statement = select(latest_candle).order_by(latest_candle.open_time.asc())
+        else:
+            statement = statement.order_by(MarketCandle.open_time.asc()).limit(limit)
         rows = list((await db.scalars(statement)).all())
         return CandlesResponse(
             timeframe=timeframe,

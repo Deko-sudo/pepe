@@ -93,7 +93,9 @@ async def test_latest_candles_selects_from_the_limited_subquery_without_a_self_j
     sql = str(statement)
     assert "JOIN" not in sql
     assert "ORDER BY market_candles.open_time DESC" in sql
-    assert sql.count("LIMIT") == 2
+    assert "ORDER BY market_candles.open_time ASC" not in sql
+    assert "ORDER BY anon_1.open_time ASC" in sql
+    assert sql.count("LIMIT") == 1
     assert result is not None
     assert result.items[0].open == "100.00"
 
