@@ -16,7 +16,6 @@ from app.candle_sync_service import (
     CandleSyncRetryable,
     CandleSyncRetryReason,
     CandleSyncService,
-    CandleSyncSuccess,
     CandleSyncTarget,
 )
 
@@ -105,16 +104,19 @@ async def test_bootstrap_uses_exact_elapsed_window_and_owner_safe_lifecycle() ->
 
     result = await service.sync(target, now)
 
-    assert result == CandleSyncSuccess(target.instrument_id, target.timeframe, written=0)
+    assert result == CandleSyncRetryable(
+        target.instrument_id,
+        target.timeframe,
+        CandleSyncRetryReason.INVALID_PROVIDER_RESPONSE,
+    )
     assert provider.requests
     assert provider.requests[0].from_time == datetime(2026, 1, 1, 11, 55, tzinfo=UTC)
-    assert provider.requests[-1].to_time == datetime(2026, 1, 8, 11, 55, tzinfo=UTC)
-    assert all(
-        request.to_time - request.from_time <= timedelta(minutes=5 * 499)
-        for request in provider.requests
+    assert (
+        provider.requests[0].to_time - provider.requests[0].from_time
+        == timedelta(minutes=5 * 499)
     )
     assert events[0:3] == ["acquire:owner", "create", "latest"]
-    assert events[-2:] == ["commit", "release:owner"]
+    assert events[-2:] == ["rollback", "release:owner"]
 
 
 @pytest.mark.asyncio

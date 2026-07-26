@@ -217,6 +217,8 @@ class CandleSyncService:
                 to_time=page_to,
             )
             page = await self._provider.fetch_candles(page_request)
+            if not page and page_to != request.to_time:
+                return None
             if not self._valid_response(target, request, page):
                 return None
             for candle in page:
@@ -230,9 +232,6 @@ class CandleSyncService:
         if not open_times:
             return ()
         if detect_gaps(open_times, target.timeframe):
-            return None
-        expected_count = int((request.to_time - request.from_time) / interval) + 1
-        if len(open_times) != expected_count:
             return None
         return tuple(deduplicated[open_time] for open_time in open_times)
 

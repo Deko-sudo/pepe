@@ -5,7 +5,7 @@ import os
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -89,6 +89,14 @@ def _candle(*, close: Decimal, source_label: str) -> NormalizedCandle:
     )
 
 
+def _open_times(request: CandleRequest) -> tuple[datetime, ...]:
+    step = timedelta(minutes=1)
+    return tuple(
+        request.from_time + step * index
+        for index in range(int((request.to_time - request.from_time) / step) + 1)
+    )
+
+
 class StaticProvider:
     def __init__(self, candle: NormalizedCandle) -> None:
         self.candle = candle
@@ -96,8 +104,14 @@ class StaticProvider:
 
     async def fetch_candles(self, request: CandleRequest) -> tuple[NormalizedCandle, ...]:
         self.calls += 1
-        assert request.from_time <= self.candle.open_time <= request.to_time
-        return (self.candle,)
+        return tuple(
+            replace(
+                self.candle,
+                open_time=open_time,
+                close_time=open_time + timedelta(minutes=1),
+            )
+            for open_time in _open_times(request)
+        )
 
 
 class BlockingProvider(StaticProvider):
@@ -112,11 +126,9 @@ class BlockingProvider(StaticProvider):
         self._release = release
 
     async def fetch_candles(self, request: CandleRequest) -> tuple[NormalizedCandle, ...]:
-        self.calls += 1
-        assert request.from_time <= self.candle.open_time <= request.to_time
         self._started.set()
         await self._release.wait()
-        return (self.candle,)
+        return await super().fetch_candles(request)
 
 
 class CommitFailingUnitOfWork:
@@ -196,15 +208,21 @@ async def test_real_postgres_persists_idempotently_and_applies_candle_revision(
         SELECT count(*) OVER () AS count, close, source_label
         FROM market_candles
         WHERE instrument_id = $1 AND timeframe = $2
+        ORDER BY open_time DESC
         """,
         _BTC_USDT_ID,
         CandleTimeframe.ONE_MINUTE.value,
     )
-    assert initial_result == CandleSyncSuccess(_BTC_USDT_ID, CandleTimeframe.ONE_MINUTE, written=1)
-    assert revised_result == CandleSyncSuccess(_BTC_USDT_ID, CandleTimeframe.ONE_MINUTE, written=1)
-    assert initial_provider.calls == revised_provider.calls == 1
+    assert initial_result == CandleSyncSuccess(
+        _BTC_USDT_ID,
+        CandleTimeframe.ONE_MINUTE,
+        written=1441,
+    )
+    assert revised_result == CandleSyncSuccess(_BTC_USDT_ID, CandleTimeframe.ONE_MINUTE, written=3)
+    assert initial_provider.calls == 3
+    assert revised_provider.calls == 1
     assert row is not None
-    assert row["count"] == 1
+    assert row["count"] == 1441
     assert row["close"] == Decimal("106")
     assert row["source_label"] == "revised"
 
@@ -264,10 +282,14 @@ async def test_real_redis_owner_safe_lease_and_concurrent_sync_single_flight(
             with suppress(asyncio.CancelledError):
                 await first_task
 
-    assert first_result == CandleSyncSuccess(_BTC_USDT_ID, CandleTimeframe.ONE_MINUTE, written=1)
+    assert first_result == CandleSyncSuccess(
+        _BTC_USDT_ID,
+        CandleTimeframe.ONE_MINUTE,
+        written=1441,
+    )
     assert second_result == CandleSyncSkipped(
         _BTC_USDT_ID,
         CandleTimeframe.ONE_MINUTE,
         CandleSyncSkipReason.LEASE_HELD,
     )
-    assert provider.calls == 1
+    assert provider.calls == 3
