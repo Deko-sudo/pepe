@@ -6,8 +6,9 @@ from pydantic import ValidationError
 from redis.exceptions import RedisError
 
 from app import quote_refresh
+from app.celery_app import celery_app
 from app.config import WorkerSettings, worker_settings
-from app.tasks import heartbeat, refresh_quotes, run_test_task
+from app.tasks import heartbeat, refresh_quotes, run_test_task, sync_candles
 
 
 def test_heartbeat_returns_ok() -> None:
@@ -43,6 +44,18 @@ def test_quote_refresh_retries_transient_datastore_failures_with_bounded_backoff
     task = refresh_quotes._get_current_object()
     assert task.autoretry_for == (OSError, asyncpg.PostgresError, RedisError)
     assert task.retry_backoff is True
+    assert task.retry_backoff_max == 600
+
+
+def test_candle_task_uses_dedicated_queue_schedule_and_transient_retries() -> None:
+    task = sync_candles._get_current_object()
+    assert celery_app.conf.task_routes["candles.sync"] == {
+        "queue": worker_settings.candle_queue_name,
+    }
+    schedule = celery_app.conf.beat_schedule["sync-fake-historical-candles"]
+    assert schedule["task"] == "candles.sync"
+    assert schedule["schedule"] == worker_settings.candle_scheduler_interval_seconds
+    assert task.autoretry_for == (OSError, asyncpg.PostgresError, RedisError)
     assert task.retry_backoff_max == 600
 
 

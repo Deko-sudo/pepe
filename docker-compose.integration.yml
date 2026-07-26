@@ -1,22 +1,22 @@
-# Disposable Stage 6 worker integration dependencies.
-# Start: docker compose -p pepe-stage6-it -f docker-compose.integration.yml up -d --build && \
-#        docker compose -p pepe-stage6-it -f docker-compose.integration.yml wait migrate
-# Test:  TEST_DATABASE_URL=postgresql+asyncpg://pepe_stage6:pepe_stage6@localhost:55432/pepe_stage6 \
-#        TEST_REDIS_URL=redis://localhost:56379/0 apps/worker/.venv/bin/python -m pytest apps/worker/tests/test_quote_refresh_integration.py -q
-# Stop:  docker compose -p pepe-stage6-it -f docker-compose.integration.yml down
+# Disposable Stage 7 PostgreSQL/Redis integration dependencies.
+# Start: docker compose -p pepe-stage7-it -f docker-compose.integration.yml up -d --build && \
+#        docker compose -p pepe-stage7-it -f docker-compose.integration.yml wait migrate
+# Test:  TEST_DATABASE_URL=postgresql+asyncpg://pepe_stage7:pepe_stage7@localhost:55432/pepe_stage7 \
+#        TEST_REDIS_URL=redis://localhost:56379/0 apps/worker/.venv/bin/python -m pytest apps/worker/tests/test_candle_sync_integration.py -q
+# Stop:  docker compose -p pepe-stage7-it -f docker-compose.integration.yml down
 services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: pepe_stage6
-      POSTGRES_USER: pepe_stage6
-      POSTGRES_PASSWORD: pepe_stage6
+      POSTGRES_DB: pepe_stage7
+      POSTGRES_USER: pepe_stage7
+      POSTGRES_PASSWORD: pepe_stage7
     ports:
-      - "${STAGE6_TEST_POSTGRES_PORT:-55432}:5432"
+      - "${STAGE7_TEST_POSTGRES_PORT:-55432}:5432"
     tmpfs:
       - /var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pepe_stage6 -d pepe_stage6"]
+      test: ["CMD-SHELL", "pg_isready -U pepe_stage7 -d pepe_stage7"]
       interval: 2s
       timeout: 3s
       retries: 20
@@ -25,7 +25,7 @@ services:
     image: redis:7-alpine
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     ports:
-      - "${STAGE6_TEST_REDIS_PORT:-56379}:6379"
+      - "${STAGE7_TEST_REDIS_PORT:-56379}:6379"
     tmpfs:
       - /data
     healthcheck:
@@ -35,17 +35,14 @@ services:
       retries: 20
 
   migrate:
-    # Build the current API migration runtime; never depend on a pre-existing local image.
-    image: pepe-stage6-api-integration
+    image: pepe-stage7-api-integration
     build:
       context: .
       dockerfile: apps/api/Dockerfile
     working_dir: /workspace/apps/api
     command: ["alembic", "upgrade", "head"]
     environment:
-      DATABASE_URL: postgresql+asyncpg://pepe_stage6:pepe_stage6@postgres:5432/pepe_stage6
-    volumes:
-      - .:/workspace:ro
+      DATABASE_URL: postgresql+asyncpg://pepe_stage7:pepe_stage7@postgres:5432/pepe_stage7
     depends_on:
       postgres:
         condition: service_healthy

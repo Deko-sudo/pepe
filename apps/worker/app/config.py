@@ -10,6 +10,9 @@ class WorkerSettings(BaseSettings):
     quote_refresh_lease_ttl_seconds: int = Field(default=120, gt=0)
     database_url: str = "postgresql+asyncpg://pepe:change_me@localhost:5432/pepe"
     quote_queue_name: str = "quotes"
+    candle_queue_name: str = "candles"
+    candle_sync_lease_ttl_seconds: int = Field(default=300, gt=0)
+    candle_scheduler_interval_seconds: int = Field(default=300, gt=0)
     quote_fake_provider_enabled: bool = False
     quote_scheduler_interval_seconds: int = Field(default=60, gt=0)
     log_level: str = "INFO"

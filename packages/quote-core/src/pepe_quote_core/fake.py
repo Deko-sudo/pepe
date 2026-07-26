@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import ClassVar, Protocol
 
+from .candles import CandleRequest, NormalizedCandle, timeframe_duration
 from .types import (
     DataStatus,
     DelayClass,
@@ -82,3 +83,52 @@ class FakeQuoteProvider:
             schema_version=1,
             provider_event_id=f"fake:{request.instrument_slug}:{int(now.timestamp())}",
         )
+
+
+class HistoricalCandleProvider(Protocol):
+    async def fetch_candles(self, request: CandleRequest) -> tuple[NormalizedCandle, ...]: ...
+
+
+class FakeHistoricalCandleProvider:
+    """Deterministic provider-neutral closed-candle source for local development/tests."""
+
+    _PRICES: ClassVar[dict[str, Decimal]] = FakeQuoteProvider._PRICES
+
+    def __init__(self, *, clock: Callable[[], datetime]) -> None:
+        self._clock = clock
+
+    async def fetch_candles(self, request: CandleRequest) -> tuple[NormalizedCandle, ...]:
+        try:
+            price = self._PRICES[request.instrument_slug]
+        except KeyError as error:
+            raise ValueError("unsupported fake instrument") from error
+        received_at = self._clock()
+        if received_at.tzinfo is None:
+            received_at = received_at.replace(tzinfo=UTC)
+        duration = timeframe_duration(request.timeframe)
+        candles: list[NormalizedCandle] = []
+        open_time = request.from_time
+        while open_time <= request.to_time:
+            offset = Decimal(int(open_time.timestamp() // duration.total_seconds()) % 11 - 5)
+            opening = price + offset
+            closing = opening + Decimal("0.25")
+            candles.append(
+                NormalizedCandle(
+                    instrument_id=request.instrument_id,
+                    timeframe=request.timeframe,
+                    open_time=open_time,
+                    close_time=open_time + duration,
+                    open=opening,
+                    high=closing + Decimal("0.25"),
+                    low=opening - Decimal("0.25"),
+                    close=closing,
+                    base_volume=Decimal("1"),
+                    quote_volume=closing,
+                    trade_count=1,
+                    source_label="Synthetic historical candle source",
+                    venue_label="Synthetic test venue",
+                    received_at=max(received_at, open_time + duration),
+                ),
+            )
+            open_time += duration
+        return tuple(candles)

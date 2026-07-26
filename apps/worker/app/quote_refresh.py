@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 import asyncpg
 from pepe_quote_core import (
@@ -16,7 +16,7 @@ from pepe_quote_core import (
 from redis import asyncio as redis_asyncio
 
 from app.config import worker_settings
-from app.quote_redis import QuoteRedisStore
+from app.quote_redis import QuoteRedisStore, RedisClient
 from app.quote_refresh_service import (
     QuoteRefreshService,
     RefreshRetryable,
@@ -210,7 +210,7 @@ async def refresh_fake_quotes() -> dict[str, int | str]:
             targets = await _load_fake_targets(connection)
             now = datetime.now(UTC)
             store = QuoteRedisStore(
-                redis,
+                cast(RedisClient, redis),
                 cache_namespace=worker_settings.quote_cache_namespace,
                 cache_ttl_seconds=worker_settings.quote_cache_ttl_seconds,
                 lease_ttl_seconds=worker_settings.quote_refresh_lease_ttl_seconds,

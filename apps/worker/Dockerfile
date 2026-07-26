@@ -8,4 +8,6 @@ WORKDIR /workspace/apps/worker
 RUN pip install --no-cache-dir /workspace/packages/quote-core \
     && pip install --no-cache-dir ".[dev]"
 
-CMD ["python", "-m", "app.main"]
+# Consume the explicitly routed quote and candle queues in addition to Celery's default queue.
+# Expand queue settings at runtime so Compose environment overrides stay effective.
+CMD ["sh", "-c", "exec celery -A app.celery_app worker --loglevel=info --concurrency=2 --queues=celery,${QUOTE_QUEUE_NAME:-quotes},${CANDLE_QUEUE_NAME:-candles}"]
