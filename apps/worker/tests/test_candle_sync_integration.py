@@ -140,8 +140,8 @@ class CommitFailingUnitOfWork:
     ) -> object | None:
         return await self._inner.latest_open_time(instrument_id, timeframe)
 
-    async def upsert(self, candle: NormalizedCandle) -> bool:
-        return await self._inner.upsert(candle)
+    async def upsert_many(self, candles: tuple[NormalizedCandle, ...]) -> int:
+        return await self._inner.upsert_many(candles)
 
     async def commit(self) -> None:
         raise OSError("injected commit failure")

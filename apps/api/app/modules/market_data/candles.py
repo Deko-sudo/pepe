@@ -5,6 +5,7 @@ from datetime import datetime
 from pepe_quote_core import CandleTimeframe, timeframe_duration
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.db.models.asset_instrument import AssetInstrument
 from app.db.models.market_candle import MarketCandle
@@ -40,7 +41,7 @@ class HistoricalCandleService:
             statement = statement.where(MarketCandle.open_time < to_time)
         if from_time is None and to_time is None:
             latest = statement.order_by(MarketCandle.open_time.desc()).limit(limit).subquery()
-            statement = select(MarketCandle).join(latest, MarketCandle.id == latest.c.id)
+            statement = select(aliased(MarketCandle, latest))
         statement = statement.order_by(MarketCandle.open_time.asc()).limit(limit)
         rows = list((await db.scalars(statement)).all())
         return CandlesResponse(

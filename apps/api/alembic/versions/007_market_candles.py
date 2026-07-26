@@ -76,13 +76,5 @@ def upgrade() -> None:
             name="ck_market_candles_trade_count_nonnegative",
         ),
     )
-    op.create_index(
-        "ix_market_candles_instrument_timeframe_open",
-        "market_candles",
-        ["instrument_id", "timeframe", "open_time"],
-    )
-
-
 def downgrade() -> None:
-    op.drop_index("ix_market_candles_instrument_timeframe_open", table_name="market_candles")
     op.drop_table("market_candles")

@@ -16,6 +16,7 @@ from app.candle_sync_service import (
     CandleSyncRetryable,
     CandleSyncRetryReason,
     CandleSyncService,
+    CandleSyncSuccess,
     CandleSyncTarget,
 )
 
@@ -56,10 +57,10 @@ class Uow:
         self.events.append("latest")
         return self.latest
 
-    async def upsert(self, candle: NormalizedCandle) -> bool:
-        self.events.append("upsert")
-        self.candles.append(candle)
-        return True
+    async def upsert_many(self, candles: tuple[NormalizedCandle, ...]) -> int:
+        self.events.append("upsert_many")
+        self.candles.extend(candles)
+        return len(candles)
 
     async def commit(self) -> None:
         self.events.append("commit")
@@ -162,6 +163,27 @@ async def test_provider_failure_is_retryable_and_releases_lease() -> None:
         CandleSyncRetryReason.PROVIDER_FAILED,
     )
     assert events == ["acquire:owner", "create", "latest", "rollback", "release:owner"]
+
+
+@pytest.mark.asyncio
+async def test_sync_batches_all_fetched_candles_into_one_upsert() -> None:
+    events: list[str] = []
+    now = datetime(2026, 1, 8, 12, tzinfo=UTC)
+    target = CandleSyncTarget(uuid.uuid4(), "btc-usdt", CandleTimeframe.ONE_HOUR)
+    uow = Uow(events, latest=datetime(2026, 1, 8, 8, tzinfo=UTC))
+    service = CandleSyncService(
+        leases=Leases(events),
+        provider=FakeHistoricalCandleProvider(clock=lambda: now),
+        unit_of_work_factory=Factory(uow),
+        owner_token_factory=lambda: "owner",
+    )
+
+    result = await service.sync(target, now)
+
+    assert isinstance(result, CandleSyncSuccess)
+    assert result.written == 6
+    assert events.count("upsert_many") == 1
+    assert len(uow.candles) == 6
 
 
 @pytest.mark.asyncio

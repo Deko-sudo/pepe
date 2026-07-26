@@ -30,6 +30,7 @@ class CandleRequest:
     to_time: datetime
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "instrument_id", uuid.UUID(str(self.instrument_id)))
         _validate_utc_timestamp("from_time", self.from_time)
         _validate_utc_timestamp("to_time", self.to_time)
         if not self.instrument_slug:
@@ -106,7 +107,7 @@ def detect_gaps(
 
 @dataclass(frozen=True, slots=True)
 class NormalizedCandle:
-    instrument_id: uuid.UUID | str
+    instrument_id: uuid.UUID
     timeframe: CandleTimeframe
     open_time: datetime
     close_time: datetime
@@ -122,7 +123,7 @@ class NormalizedCandle:
     received_at: datetime
 
     def __post_init__(self) -> None:
-        uuid.UUID(str(self.instrument_id))
+        object.__setattr__(self, "instrument_id", uuid.UUID(str(self.instrument_id)))
         timestamps = (
             ("open_time", self.open_time),
             ("close_time", self.close_time),

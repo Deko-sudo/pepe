@@ -92,7 +92,11 @@ class HistoricalCandleProvider(Protocol):
 class FakeHistoricalCandleProvider:
     """Deterministic provider-neutral closed-candle source for local development/tests."""
 
-    _PRICES: ClassVar[dict[str, Decimal]] = FakeQuoteProvider._PRICES
+    _PRICES: ClassVar[dict[str, Decimal]] = {
+        "btc-usdt": Decimal("60000.00"),
+        "eth-usdt": Decimal("3000.00"),
+        "xau-usd": Decimal("2300.00"),
+    }
 
     def __init__(self, *, clock: Callable[[], datetime]) -> None:
         self._clock = clock

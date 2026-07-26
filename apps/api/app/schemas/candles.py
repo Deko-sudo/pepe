@@ -7,6 +7,10 @@ from pepe_quote_core import CandleTimeframe, decimal_to_string
 from pydantic import BaseModel
 
 
+def _required_decimal_to_string(value: Decimal) -> str:
+    return format(value, "f")
+
+
 class CandleResponse(BaseModel):
     open_time: datetime
     close_time: datetime
@@ -41,10 +45,10 @@ class CandleResponse(BaseModel):
         return cls(
             open_time=open_time.astimezone(UTC),
             close_time=close_time.astimezone(UTC),
-            open=decimal_to_string(open_price) or "0",
-            high=decimal_to_string(high) or "0",
-            low=decimal_to_string(low) or "0",
-            close=decimal_to_string(close) or "0",
+            open=_required_decimal_to_string(open_price),
+            high=_required_decimal_to_string(high),
+            low=_required_decimal_to_string(low),
+            close=_required_decimal_to_string(close),
             base_volume=decimal_to_string(base_volume),
             quote_volume=decimal_to_string(quote_volume),
             trade_count=trade_count,

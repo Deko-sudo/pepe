@@ -8,7 +8,6 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
-    Index,
     Integer,
     Numeric,
     String,
@@ -47,12 +46,6 @@ class MarketCandle(Base):
         CheckConstraint(
             "trade_count IS NULL OR trade_count >= 0",
             name="ck_market_candles_trade_count_nonnegative",
-        ),
-        Index(
-            "ix_market_candles_instrument_timeframe_open",
-            "instrument_id",
-            "timeframe",
-            "open_time",
         ),
     )
 

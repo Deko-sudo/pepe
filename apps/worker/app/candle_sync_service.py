@@ -49,7 +49,7 @@ class CandleUnitOfWork(Protocol):
         timeframe: CandleTimeframe,
     ) -> object | None: ...
 
-    async def upsert(self, candle: NormalizedCandle) -> bool: ...
+    async def upsert_many(self, candles: tuple[NormalizedCandle, ...]) -> int: ...
 
     async def commit(self) -> None: ...
 
@@ -175,9 +175,7 @@ class CandleSyncService:
                         target.timeframe,
                         CandleSyncRetryReason.INVALID_PROVIDER_RESPONSE,
                     )
-                written = 0
-                for candle in candles:
-                    written += await unit_of_work.upsert(candle)
+                written = await unit_of_work.upsert_many(candles)
                 await unit_of_work.commit()
             except Exception:
                 if unit_of_work is not None:

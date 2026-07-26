@@ -16,6 +16,7 @@ from app.candle_sync_service import (
     CandleSyncSkipped,
     CandleSyncSuccess,
     CandleSyncTarget,
+    HistoricalCandleProvider,
 )
 from app.config import worker_settings
 
@@ -44,14 +45,20 @@ class AsyncpgCandleUnitOfWork:
             ),
         )
 
-    async def upsert(self, candle: NormalizedCandle) -> bool:
-        command_tag = await self._connection.execute(
+    async def upsert_many(self, candles: tuple[NormalizedCandle, ...]) -> int:
+        """Upsert one fetched page-set in a single PostgreSQL statement."""
+        if not candles:
+            return 0
+        rows = await self._connection.fetch(
             """
             INSERT INTO market_candles (
                 id, instrument_id, timeframe, open_time, close_time, open, high, low, close,
                 base_volume, quote_volume, trade_count, source_label, venue_label, received_at
-            ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
+            )
+            SELECT * FROM UNNEST(
+                $1::uuid[], $2::uuid[], $3::text[], $4::timestamptz[], $5::timestamptz[],
+                $6::numeric[], $7::numeric[], $8::numeric[], $9::numeric[], $10::numeric[],
+                $11::numeric[], $12::integer[], $13::text[], $14::text[], $15::timestamptz[]
             ) ON CONFLICT (instrument_id, timeframe, open_time) DO UPDATE SET
                 close_time = EXCLUDED.close_time,
                 open = EXCLUDED.open,
@@ -65,24 +72,25 @@ class AsyncpgCandleUnitOfWork:
                 venue_label = EXCLUDED.venue_label,
                 received_at = EXCLUDED.received_at,
                 updated_at = now()
+            RETURNING 1
             """,
-            uuid.uuid4(),
-            candle.instrument_id,
-            candle.timeframe.value,
-            candle.open_time,
-            candle.close_time,
-            candle.open,
-            candle.high,
-            candle.low,
-            candle.close,
-            candle.base_volume,
-            candle.quote_volume,
-            candle.trade_count,
-            candle.source_label,
-            candle.venue_label,
-            candle.received_at,
+            [uuid.uuid4() for _ in candles],
+            [candle.instrument_id for candle in candles],
+            [candle.timeframe.value for candle in candles],
+            [candle.open_time for candle in candles],
+            [candle.close_time for candle in candles],
+            [candle.open for candle in candles],
+            [candle.high for candle in candles],
+            [candle.low for candle in candles],
+            [candle.close for candle in candles],
+            [candle.base_volume for candle in candles],
+            [candle.quote_volume for candle in candles],
+            [candle.trade_count for candle in candles],
+            [candle.source_label for candle in candles],
+            [candle.venue_label for candle in candles],
+            [candle.received_at for candle in candles],
         )
-        return str(command_tag).endswith(" 1")
+        return len(rows)
 
     async def commit(self) -> None:
         await self._transaction.commit()
@@ -101,9 +109,12 @@ class AsyncpgCandleUnitOfWorkFactory:
         return AsyncpgCandleUnitOfWork(self._connection, transaction)
 
 
-async def sync_fake_candles() -> dict[str, int | str]:
-    if not worker_settings.quote_fake_provider_enabled:
-        return {"status": "disabled", "synced": 0}
+async def sync_candles(
+    provider: HistoricalCandleProvider,
+    *,
+    now: datetime | None = None,
+) -> dict[str, int | str]:
+    """Compose worker infrastructure around any historical-candle provider."""
     connection = await asyncpg.connect(
         worker_settings.database_url.replace("+asyncpg", ""),
         timeout=10,
@@ -118,16 +129,16 @@ async def sync_fake_candles() -> dict[str, int | str]:
         )
         try:
             targets = await _load_targets(connection)
-            now = datetime.now(UTC)
+            sync_time = now or datetime.now(UTC)
             service = CandleSyncService(
                 leases=CandleRedisLeaseStore(
                     cast(RedisClient, redis),
                     lease_ttl_seconds=worker_settings.candle_sync_lease_ttl_seconds,
                 ),
-                provider=FakeHistoricalCandleProvider(clock=lambda: now),
+                provider=provider,
                 unit_of_work_factory=AsyncpgCandleUnitOfWorkFactory(connection),
             )
-            results = [await service.sync(target, now) for target in targets]
+            results = [await service.sync(target, sync_time) for target in targets]
             retryable = [result for result in results if isinstance(result, CandleSyncRetryable)]
             if retryable:
                 reasons = ", ".join(sorted({result.reason.value for result in retryable}))
@@ -141,6 +152,14 @@ async def sync_fake_candles() -> dict[str, int | str]:
             await redis.aclose()
     finally:
         await connection.close()
+
+
+async def sync_fake_candles() -> dict[str, int | str]:
+    """Run the explicitly enabled local-development fake provider."""
+    if not worker_settings.candle_fake_provider_enabled:
+        return {"status": "disabled", "synced": 0}
+    now = datetime.now(UTC)
+    return await sync_candles(FakeHistoricalCandleProvider(clock=lambda: now), now=now)
 
 
 async def _load_targets(connection: asyncpg.Connection[Any]) -> tuple[CandleSyncTarget, ...]:
