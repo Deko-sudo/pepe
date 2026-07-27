@@ -187,6 +187,27 @@ async def test_sync_batches_all_fetched_candles_into_one_upsert() -> None:
 
 
 @pytest.mark.asyncio
+async def test_fetch_pages_rejects_a_terminal_page_missing_its_final_boundary() -> None:
+    class TruncatedProvider(FakeHistoricalCandleProvider):
+        async def fetch_candles(self, request: CandleRequest) -> tuple[NormalizedCandle, ...]:
+            return (await super().fetch_candles(request))[:-1]
+
+    now = datetime(2026, 1, 8, 12, tzinfo=UTC)
+    target = CandleSyncTarget(uuid.uuid4(), "btc-usdt", CandleTimeframe.ONE_MINUTE)
+    service = CandleSyncService(
+        leases=Leases([]), provider=TruncatedProvider(clock=lambda: now),
+        unit_of_work_factory=Factory(Uow([])),
+    )
+    request = CandleRequest(
+        instrument_id=target.instrument_id, instrument_slug=target.instrument_slug,
+        timeframe=target.timeframe, from_time=datetime(2026, 1, 8, 11, 57, tzinfo=UTC),
+        to_time=datetime(2026, 1, 8, 11, 59, tzinfo=UTC),
+    )
+
+    assert await service._fetch_pages(target, request) is None
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("instrument_slug", ["btc-usdt", "eth-usdt", "xau-usd"])
 @pytest.mark.parametrize("timeframe", list(CandleTimeframe))
 async def test_fake_provider_supports_each_required_instrument_and_timeframe(

@@ -229,6 +229,8 @@ class CandleSyncService:
         open_times = tuple(sorted(deduplicated))
         if not open_times:
             return ()
+        if open_times[0] != request.from_time or open_times[-1] != request.to_time:
+            return None
         if detect_gaps(open_times, target.timeframe):
             return None
         return tuple(deduplicated[open_time] for open_time in open_times)
