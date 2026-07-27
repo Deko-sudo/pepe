@@ -5,9 +5,10 @@ import pytest
 from pydantic import ValidationError
 from redis.exceptions import RedisError
 
-from app import quote_refresh
+from app import candle_sync, quote_refresh
+from app.celery_app import celery_app
 from app.config import WorkerSettings, worker_settings
-from app.tasks import heartbeat, refresh_quotes, run_test_task
+from app.tasks import heartbeat, refresh_quotes, run_test_task, sync_candles
 
 
 def test_heartbeat_returns_ok() -> None:
@@ -44,6 +45,48 @@ def test_quote_refresh_retries_transient_datastore_failures_with_bounded_backoff
     assert task.autoretry_for == (OSError, asyncpg.PostgresError, RedisError)
     assert task.retry_backoff is True
     assert task.retry_backoff_max == 600
+
+
+def test_candle_task_uses_dedicated_queue_schedule_and_transient_retries() -> None:
+    task = sync_candles._get_current_object()
+    assert celery_app.conf.task_routes["candles.sync"] == {
+        "queue": worker_settings.candle_queue_name,
+    }
+    schedule = celery_app.conf.beat_schedule["sync-fake-historical-candles"]
+    assert schedule["task"] == "candles.sync"
+    assert schedule["schedule"] == worker_settings.candle_scheduler_interval_seconds
+    assert task.autoretry_for == (OSError, asyncpg.PostgresError, RedisError)
+    assert task.retry_backoff_max == 600
+
+
+@pytest.mark.asyncio
+async def test_fake_candle_runner_has_a_dedicated_enablement_flag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sync = AsyncMock(return_value={"status": "ok", "synced": 0, "skipped": 0})
+    monkeypatch.setattr("app.candle_sync.worker_settings.candle_fake_provider_enabled", True)
+    monkeypatch.setattr("app.candle_sync.sync_candles", sync)
+
+    result = await candle_sync.sync_fake_candles()
+
+    assert result == {"status": "ok", "synced": 0, "skipped": 0}
+    await_args = sync.await_args
+    assert await_args is not None
+    provider = await_args.args[0]
+    assert provider.__class__.__name__ == "FakeHistoricalCandleProvider"
+    assert "now" in await_args.kwargs
+
+
+@pytest.mark.asyncio
+async def test_fake_candle_runner_does_not_connect_when_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    connect = AsyncMock()
+    monkeypatch.setattr("app.candle_sync.worker_settings.candle_fake_provider_enabled", False)
+    monkeypatch.setattr("app.candle_sync.asyncpg.connect", connect)
+
+    assert await candle_sync.sync_fake_candles() == {"status": "disabled", "synced": 0}
+    connect.assert_not_awaited()
 
 
 @pytest.mark.asyncio

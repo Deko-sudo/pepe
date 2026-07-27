@@ -24,7 +24,7 @@ Telegram Mini App для рыночной аналитики криптовал�
 4. Sessions and API authorization — completed and merged in [PR #5](https://github.com/Deko-sudo/pepe/pull/5).
 5. Asset catalog and market provider abstraction — implementation in progress; not complete until merged.
 6. Current quotes — not started.
-7. Candles and historical data — not started.
+7. Candles and historical data — implementation in progress.
 8. Real market UI — not started.
 9. Analytics core — not started.
 10. Reports and publishing — not started.
@@ -37,7 +37,7 @@ Telegram Mini App для рыночной аналитики криптовал�
 
 - **Stage 5:** asset catalog; BTC, ETH, XAU/USD; provider abstraction; разные правила ликвидности для crypto, metals, indices и yields.
 - **Stage 6:** current quotes; cache; timestamps; stale handling; provider failover.
-- **Stage 7:** OHLCV и historical candles с достаточным indicator warm-up: D1 — 250, H4 — 300, H1 — 300, M15 — 200.
+- **Stage 7:** OHLCV и historical candles. Текущий контракт и operational semantics описаны в [Stage 7 architecture](docs/architecture/stage-7-candles-historical-data.md); indicator warm-up остаётся дальнейшим потребителем данных.
 - **Stage 8:** real market UI с реальными данными и состояниями loading, stale, unavailable, error.
 - **Stage 9:** Swing High / Swing Low, EMA, ATR, RSI, volume, FVG, sessions, BTC context, Trend Score и матрица триады. До реализации требуется формализовать Trend Score/веса/пороги, матрицу триады, FVG formulas/mitigation, session timezone/DST; BTC context применим только к crypto, а XAU/USD, indices и yields требуют отдельной логики.
 - **Stage 10:** reports, publishing, history и безопасный аналитический язык.
@@ -152,6 +152,7 @@ npm run dev
 #### Backend API
 
 ```bash
+pip install -e packages/quote-core
 cd apps/api
 pip install -e ".[dev]"
 uvicorn app.main:app --reload
@@ -168,6 +169,7 @@ python -m app.main
 #### Worker
 
 ```bash
+pip install -e packages/quote-core
 cd apps/worker
 pip install -e ".[dev]"
 celery -A app.celery_app worker
@@ -243,6 +245,21 @@ rather than skip.
 Current-quote provenance is persisted with each durable latest quote and encoded in the unchanged
 Redis v1 payload. PostgreSQL fallback therefore returns the same nested provenance object as a
 cache hit; provider labels originate from normalized provider output, not API configuration.
+
+### Candles and historical data (Stage 7)
+
+The authenticated historical-candle endpoint is
+`GET /api/v1/market-data/instruments/{slug}/candles?timeframe={1m|5m|15m|1h|4h|1d}`.
+It returns persisted, closed OHLCV candles only, ordered by ascending `open_time`, and sends
+`Cache-Control: private, no-store`. Optional RFC 3339 UTC `from` and `to` parameters define a
+half-open interval (`open_time >= from`, `open_time < to`); `limit` defaults to 500 and is capped
+at 1000. See [Stage 7 architecture](docs/architecture/stage-7-candles-historical-data.md) for
+range completion, error semantics, the bootstrap windows, Redis lease behavior, and queue routing.
+
+Compose installs `quote-core` from the repository into the API and worker images. The worker
+consumes `celery`, `quotes`, and `candles`; the scheduler routes `quote.refresh` to `quotes` and
+`candles.sync` to `candles`. The queue names, scheduler intervals, and candle lease TTL are
+configurable through the corresponding variables in `.env.example`.
 
 ## Структура монорепозитория
 

@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.db.base import Base
 from app.db.models.asset_instrument import AssetInstrument  # noqa: F401
 from app.db.models.latest_market_quote import LatestMarketQuote  # noqa: F401
+from app.db.models.market_candle import MarketCandle  # noqa: F401
 from app.db.models.provider_instrument_mapping import ProviderInstrumentMapping  # noqa: F401
 from app.db.models.system_metadata import SystemMetadata  # noqa: F401
 from app.db.models.user import User  # noqa: F401

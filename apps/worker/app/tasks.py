@@ -3,6 +3,7 @@ import logging
 import asyncpg
 from redis.exceptions import RedisError
 
+from app.candle_sync import run_sync_fake_candles
 from app.celery_app import celery_app
 from app.quote_refresh import run_refresh_fake_quotes
 
@@ -39,3 +40,14 @@ def run_test_task(value: str = "test") -> dict[str, str]:
 )
 def refresh_quotes() -> dict[str, int | str]:
     return run_refresh_fake_quotes()
+
+
+@celery_app.task(
+    name="candles.sync",
+    autoretry_for=(OSError, asyncpg.PostgresError, RedisError),
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+)
+def sync_candles() -> dict[str, int | str]:
+    return run_sync_fake_candles()

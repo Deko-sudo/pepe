@@ -4,7 +4,23 @@ from .cache import (
     decode_current_quote_cache,
     encode_current_quote_cache,
 )
-from .fake import FakeQuoteProvider, QuoteProvider
+from .candles import (
+    CandleRequest,
+    CandleTimeframe,
+    NormalizedCandle,
+    align_open_time,
+    bootstrap_window,
+    detect_gaps,
+    incremental_from,
+    latest_closed_open_time,
+    timeframe_duration,
+)
+from .fake import (
+    FakeHistoricalCandleProvider,
+    FakeQuoteProvider,
+    HistoricalCandleProvider,
+    QuoteProvider,
+)
 from .types import (
     DataStatus,
     DelayClass,
@@ -23,22 +39,33 @@ from .types import (
 
 __all__ = [
     "CachePayloadError",
+    "CandleRequest",
+    "CandleTimeframe",
     "CurrentQuoteCacheEntry",
     "DataStatus",
     "DelayClass",
+    "FakeHistoricalCandleProvider",
     "FakeQuoteProvider",
     "FreshnessPolicy",
+    "HistoricalCandleProvider",
     "MarketStatus",
     "MarketType",
+    "NormalizedCandle",
     "NormalizedQuote",
     "PriceType",
     "PublicProvenance",
     "QuoteProvider",
     "QuoteRequest",
+    "align_open_time",
+    "bootstrap_window",
     "calculate_data_status",
     "compare_quote_recency",
     "decimal_to_string",
     "decode_current_quote_cache",
+    "detect_gaps",
     "encode_current_quote_cache",
+    "incremental_from",
+    "latest_closed_open_time",
     "parse_decimal",
+    "timeframe_duration",
 ]

@@ -103,7 +103,7 @@ jobs:
 
       - run: pip install -e ../../packages/quote-core && pip install -e ".[dev]"
       - run: alembic upgrade head
-      - run: alembic current | grep -F "006 (head)"
+      - run: alembic current | grep -F "007 (head)"
       - run: python ../../scripts/verify_asset_catalog_migration.py
       - run: PEPE_RUN_POSTGRES_INTEGRATION=1 pytest tests/test_session_concurrency_postgres.py -q
       - run: alembic downgrade 004
@@ -202,6 +202,61 @@ jobs:
       - name: Run Stage 6 worker integration tests
         run: pytest tests/test_quote_refresh_integration.py -q
 
+  stage7-worker-integration:
+    name: Stage 7 worker integration
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: apps/worker
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: pepe_stage7
+          POSTGRES_USER: pepe_stage7
+          POSTGRES_PASSWORD: pepe_stage7
+        options: >-
+          --health-cmd "pg_isready -U pepe_stage7 -d pepe_stage7"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    env:
+      TEST_DATABASE_URL: postgresql+asyncpg://pepe_stage7:pepe_stage7@localhost:5432/pepe_stage7
+      TEST_REDIS_URL: redis://localhost:6379/0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install local quote-core and migration dependencies
+        run: pip install -e ../../packages/quote-core -e ../api
+      - name: Apply database migrations
+        working-directory: apps/api
+        env:
+          DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
+        run: alembic upgrade head
+      - name: Install local quote-core and worker dependencies
+        run: pip uninstall -y pepe-api && pip install -e ../../packages/quote-core -e ".[dev]"
+      - name: Run Stage 7 worker integration tests
+        run: pytest tests/test_candle_sync_integration.py -q
+
   docker:
     name: Docker
     runs-on: ubuntu-latest
@@ -240,7 +295,7 @@ jobs:
             sleep 2
           done
           curl --fail --silent --show-error http://localhost:8100/api/v1/health >/dev/null
-          docker compose exec -T api alembic current | grep -F "006 (head)"
+          docker compose exec -T api alembic current | grep -F "007 (head)"
           test "$(
             docker compose exec -T postgres psql -U pepe -d pepe -tAc \
               "SELECT to_regclass('public.user_sessions') IS NOT NULL"
