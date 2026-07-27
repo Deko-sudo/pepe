@@ -1,10 +1,13 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { Markets } from "../src/pages/markets";
+import { decimalToScaled, Markets } from "../src/pages/markets";
 
 const api = vi.hoisted(() => ({ getAssets: vi.fn(), getQuote: vi.fn(), getCandles: vi.fn() }));
-vi.mock("../src/shared/api/market", () => api);
+vi.mock("../src/shared/api/market", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../src/shared/api/market")>()),
+  ...api,
+}));
 vi.mock("../src/shared/telegram", () => ({ useTelegramAuth: () => ({ state: "valid" }) }));
 
 const asset = { id: "00000000-0000-4000-8000-000000000001", slug: "btc-usdt", symbol: "BTC/USDT", display_name: "Bitcoin", asset_class: "crypto", market_type: "spot", base_asset: "BTC", quote_asset: "USDT", price_precision: 2, quantity_precision: 8, timezone: "UTC", calendar_kind: "continuous", trading_calendar: "24x7", metadata_version: 1, is_enabled: true };
@@ -14,6 +17,11 @@ const candle = { open_time: "2026-01-01T00:00:00Z", close_time: "2026-01-01T00:0
 function renderMarkets() { return render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Markets /></QueryClientProvider>); }
 
 describe("market screen", () => {
+  it("preserves decimal differences beyond twelve fractional places", () => {
+    expect(decimalToScaled("1.0000000000001", 13)).not.toBe(decimalToScaled("1.0000000000002", 13));
+    expect(decimalToScaled("-1.2", 13)).toBe(-12000000000000n);
+  });
+
   it("renders catalog, quote provenance, chart, and all supported timeframes", async () => {
     api.getAssets.mockResolvedValue({ items: [asset], next_cursor: null });
     api.getQuote.mockResolvedValue({ items: [quote], unavailable: [], not_found: [] });
