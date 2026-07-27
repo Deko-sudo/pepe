@@ -1,12 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
+import { Providers } from "../src/app/providers";
 import { Markets } from "../src/pages/markets";
 import { Reports } from "../src/pages/reports";
 import { Settings } from "../src/pages/settings";
 
 function renderWithRouter(ui: React.ReactNode) {
-  return render(<BrowserRouter>{ui}</BrowserRouter>);
+  return render(
+    <Providers>
+      <BrowserRouter>{ui}</BrowserRouter>
+    </Providers>,
+  );
 }
 
 describe("Markets", () => {
