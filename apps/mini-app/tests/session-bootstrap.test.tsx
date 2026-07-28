@@ -348,4 +348,47 @@ describe("session bootstrap", () => {
     await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("valid:Test"));
     expect(fetchSpy).toHaveBeenCalledTimes(3);
   });
+
+  it("retains AUTH_EXCHANGE_FAILED for generic exchange errors", async () => {
+    installMockWebApp("signed-init-data", "android");
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ detail: "Forbidden." }), { status: 403 }),
+      );
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("invalid:"));
+    expect(screen.getByTestId("diagnostic")).toHaveTextContent("AUTH_EXCHANGE_FAILED");
+    expect(screen.getByTestId("error")).toHaveTextContent(
+      "Не удалось подтвердить запуск через Telegram.",
+    );
+  });
+
+  it("does not repeat bootstrap after a successful exchange", async () => {
+    installMockWebApp("signed-init-data");
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(profile), {
+          status: 200,
+          headers: { "X-Pepe-Session-Token": "desktop-session-token" },
+        }),
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify(profile), { status: 200 }));
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("valid:Test"));
+    const callsAfterSuccess = fetchSpy.mock.calls.length;
+
+    // Allow any microtasks/settle to complete
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 100));
+    });
+
+    expect(fetchSpy.mock.calls.length).toBe(callsAfterSuccess);
+  });
 });

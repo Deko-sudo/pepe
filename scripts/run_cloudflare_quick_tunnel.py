@@ -23,6 +23,82 @@ DEFAULT_TIMEOUT_SECONDS = 30
 DEFAULT_LOCAL_ORIGINS = (
     "http://localhost:3000,http://localhost:4000,http://localhost:8080"
 )
+ENV_FILE = ".env"
+ENV_BACKUP = ".env.tunnel-backup"
+TUNNEL_ENV_KEYS = (
+    "CORS_ALLOWED_ORIGINS",
+    "SESSION_ALLOWED_ORIGINS",
+    "SESSION_COOKIE_SECURE",
+    "SESSION_COOKIE_SAME_SITE",
+    "SESSION_COOKIE_PARTITIONED",
+    "MINI_APP_URL",
+    "MINI_APP_BUILD_ID",
+)
+
+
+def _parse_env_file(path: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    if not path.exists():
+        return values
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        values[key.strip()] = value
+    return values
+
+
+def _write_env_file(path: Path, values: dict[str, str]) -> None:
+    lines = [f"{key}={values[key]}" for key in values]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def apply_tunnel_env(repo_root: Path, environment: dict[str, str]) -> None:
+    """Merge tunnel-derived config into ``.env`` so every ``docker compose``
+    invocation (rebuild, restart, ``make up``) keeps the public origin in the
+    CSRF/CORS allowlists and secure cookie settings while the tunnel is active.
+
+    Compose auto-loads ``.env`` for ``${VAR:-default}`` substitution, so writing
+    here is the only way a plain ``make up`` (or a mini-app rebuild that
+    cascade-recreates the API) preserves the public origin. Without it the API
+    reverts to localhost-only origins and the CSRF origin check rejects the
+    tunnel origin with HTTP 403.
+
+    The original ``.env`` is backed up and restored on tunnel exit so stopping
+    the tunnel cleanly reverts to safe localhost defaults. Only the
+    tunnel-controlled keys are touched; all other values (including
+    ``TELEGRAM_BOT_TOKEN``) are preserved verbatim.
+    """
+    env_path = repo_root / ENV_FILE
+    backup_path = repo_root / ENV_BACKUP
+    if env_path.exists():
+        backup_path.write_bytes(env_path.read_bytes())
+    values = _parse_env_file(env_path)
+    for key in TUNNEL_ENV_KEYS:
+        if key in environment:
+            values[key] = environment[key]
+    _write_env_file(env_path, values)
+
+
+def restore_env(repo_root: Path) -> None:
+    """Restore the original ``.env`` captured before the tunnel applied its config."""
+    env_path = repo_root / ENV_FILE
+    backup_path = repo_root / ENV_BACKUP
+    if backup_path.exists():
+        env_path.write_bytes(backup_path.read_bytes())
+        backup_path.unlink()
+    else:
+        # No backup means .env never existed before the tunnel; remove the keys
+        # we may have injected so a localhost-only stack stays the default.
+        values = _parse_env_file(env_path)
+        changed = False
+        for key in TUNNEL_ENV_KEYS:
+            if key in values:
+                del values[key]
+                changed = True
+        if changed:
+            _write_env_file(env_path, values)
 
 
 def parse_args() -> argparse.Namespace:
@@ -181,6 +257,8 @@ def main() -> int:
         compose_environment["MINI_APP_URL"] = public_url
         compose_environment["MINI_APP_BUILD_ID"] = resolve_build_id(repo_root)
 
+        apply_tunnel_env(repo_root, compose_environment)
+
         print("Building and starting the versioned Mini App service...")
         subprocess.run(
             ["docker", "compose", "up", "-d", "--build", "mini-app"],
@@ -211,6 +289,7 @@ def main() -> int:
     except KeyboardInterrupt:
         return 0
     finally:
+        restore_env(repo_root)
         stop_process(tunnel)
 
 
