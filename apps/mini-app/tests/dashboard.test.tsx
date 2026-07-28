@@ -158,8 +158,8 @@ describe("Stage 8 home dashboard", () => {
     expect(await screen.findByText("Макс. · 1h")).toBeInTheDocument();
     expect(screen.getByText("Мин. · 1h")).toBeInTheDocument();
     expect(screen.queryByText("125 000")).not.toBeInTheDocument();
-    expect(screen.getAllByText("120 000").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("115 500").length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("120 000")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("115 500")).length).toBeGreaterThan(0);
   });
 
   it("shows session, AI presentation, and no prohibited analytics", async () => {
