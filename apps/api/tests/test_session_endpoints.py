@@ -6,6 +6,11 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
+from app.modules.sessions.transport import (
+    SESSION_FALLBACK_REQUEST_HEADER,
+    SESSION_FALLBACK_REQUEST_VALUE,
+    session_fallback_requested,
+)
 
 AUTH_ERROR = "Unauthorized."
 CSRF_ERROR = "Forbidden."
@@ -97,3 +102,19 @@ async def test_telegram_session_exchange_returns_header_fallback_token(
     success_response = schema["paths"]["/api/v1/auth/telegram/session"]["post"]["responses"]["200"]
 
     assert "X-Pepe-Session-Token" in success_response["headers"]
+
+
+@pytest.mark.parametrize(
+    ("headers", "expected"),
+    [
+        ({}, False),
+        ({SESSION_FALLBACK_REQUEST_HEADER: "android"}, False),
+        ({SESSION_FALLBACK_REQUEST_HEADER: SESSION_FALLBACK_REQUEST_VALUE}, True),
+        ({SESSION_FALLBACK_REQUEST_HEADER: " TELEGRAM-DESKTOP "}, True),
+    ],
+)
+def test_session_fallback_requires_explicit_telegram_desktop_signal(
+    headers: dict[str, str],
+    expected: bool,
+) -> None:
+    assert session_fallback_requested(headers) is expected

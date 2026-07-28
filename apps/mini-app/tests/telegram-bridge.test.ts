@@ -6,6 +6,7 @@ interface MockWebApp {
   ready: ReturnType<typeof vi.fn>;
   expand: ReturnType<typeof vi.fn>;
   initData: string;
+  platform: string;
   colorScheme: "light" | "dark";
   themeParams: Record<string, string>;
   BackButton: {
@@ -26,6 +27,7 @@ function createMockWebApp(overrides?: Partial<MockWebApp>): MockWebApp {
     ready: vi.fn(),
     expand: vi.fn(),
     initData: "user=123&hash=abc123",
+    platform: "tdesktop",
     colorScheme: "dark",
     themeParams: { bg_color: "#1a1a2e" },
     BackButton: {
@@ -67,6 +69,7 @@ describe("BrowserMockBridge (no Telegram SDK)", () => {
     expect(typeof bridge.ready).toBe("function");
     expect(typeof bridge.expand).toBe("function");
     expect(typeof bridge.getInitData).toBe("function");
+    expect(bridge.requiresSessionHeaderFallback()).toBe(false);
     expect(typeof bridge.getColorScheme).toBe("function");
   });
 
@@ -186,6 +189,15 @@ describe("TelegramWebAppBridge (real Telegram SDK mock)", () => {
     );
     const bridge = createTelegramBridge();
     expect(bridge.getInitData()).toBe("");
+  });
+
+  it("requests the session header fallback only on Telegram Desktop", async () => {
+    const { createTelegramBridge } = await import(
+      "../src/shared/telegram/factory"
+    );
+    expect(createTelegramBridge().requiresSessionHeaderFallback()).toBe(true);
+    mock.platform = "android";
+    expect(createTelegramBridge().requiresSessionHeaderFallback()).toBe(false);
   });
 
   it("reads colorScheme from WebApp", async () => {

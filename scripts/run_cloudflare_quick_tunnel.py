@@ -11,14 +11,18 @@ import selectors
 import signal
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
+from typing import BinaryIO
 
 QUICK_TUNNEL_URL = re.compile(r"https://[a-z0-9-]+\.trycloudflare\.com")
 BUILD_ID = re.compile(r"^[a-zA-Z0-9._-]{1,32}$")
 DEFAULT_ORIGIN = "http://localhost:4000"
 DEFAULT_TIMEOUT_SECONDS = 30
-DEFAULT_LOCAL_ORIGINS = "http://localhost:3000,http://localhost:4000,http://localhost:8080"
+DEFAULT_LOCAL_ORIGINS = (
+    "http://localhost:3000,http://localhost:4000,http://localhost:8080"
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -53,6 +57,12 @@ def stop_process(process: subprocess.Popen[bytes]) -> None:
         process.wait()
 
 
+def drain_stream(stream: BinaryIO) -> None:
+    read = stream.read
+    while chunk := read(4096):
+        print(chunk.decode(errors="replace"), end="", file=sys.stderr, flush=True)
+
+
 def resolve_build_id(repo_root: Path) -> str:
     configured = os.environ.get("MINI_APP_BUILD_ID", "").strip()
     if configured:
@@ -66,7 +76,16 @@ def resolve_build_id(repo_root: Path) -> str:
         text=True,
     ).strip()
     diff = subprocess.check_output(
-        ["git", "diff", "--binary", "HEAD", "--", "apps/mini-app", "apps/api", "apps/bot"],
+        [
+            "git",
+            "diff",
+            "--binary",
+            "HEAD",
+            "--",
+            "apps/mini-app",
+            "apps/api",
+            "apps/bot",
+        ],
         cwd=repo_root,
     )
     return head if not diff else f"{head}-{hashlib.sha256(diff).hexdigest()[:8]}"
@@ -102,7 +121,10 @@ def main() -> int:
         if tunnel.poll() is not None:
             output = tunnel.stdout.read().decode(errors="replace").strip()
             print(output, file=sys.stderr)
-            print("cloudflared exited before generating a Quick Tunnel URL", file=sys.stderr)
+            print(
+                "cloudflared exited before generating a Quick Tunnel URL",
+                file=sys.stderr,
+            )
             return 1
 
         events = selector.select(timeout=min(0.5, max(0, deadline - time.monotonic())))
@@ -110,7 +132,9 @@ def main() -> int:
             chunk = os.read(tunnel.stdout.fileno(), 4096).decode(errors="replace")
             output_buffer += chunk
             lines = output_buffer.splitlines(keepends=True)
-            output_buffer = lines.pop() if lines and not lines[-1].endswith("\n") else ""
+            output_buffer = (
+                lines.pop() if lines and not lines[-1].endswith("\n") else ""
+            )
             for line in lines:
                 match = QUICK_TUNNEL_URL.search(line)
                 if match:
@@ -129,6 +153,16 @@ def main() -> int:
         )
         return 1
 
+    selector.unregister(tunnel.stdout)
+    selector.close()
+    os.set_blocking(tunnel.stdout.fileno(), True)
+    threading.Thread(
+        target=drain_stream,
+        args=(tunnel.stdout,),
+        daemon=True,
+        name="cloudflared-output-drainer",
+    ).start()
+
     try:
         print(f"Cloudflare Quick Tunnel: {public_url}")
         compose_environment = os.environ.copy()
@@ -136,7 +170,9 @@ def main() -> int:
             "CLOUDFLARE_ALLOWED_LOCAL_ORIGINS",
             DEFAULT_LOCAL_ORIGINS,
         )
-        allowed_origins = ",".join(origin for origin in (public_url, local_origins) if origin)
+        allowed_origins = ",".join(
+            origin for origin in (public_url, local_origins) if origin
+        )
         compose_environment["CORS_ALLOWED_ORIGINS"] = allowed_origins
         compose_environment["SESSION_ALLOWED_ORIGINS"] = allowed_origins
         compose_environment["SESSION_COOKIE_SECURE"] = "true"

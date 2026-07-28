@@ -61,16 +61,21 @@ export async function getCurrentUser(): Promise<UserProfile> {
 
 export async function exchangeTelegramSession(
   initData: string,
-): Promise<{ user: UserProfile; sessionToken: string }> {
+  requestHeaderFallback = false,
+): Promise<{ user: UserProfile; sessionToken: string | null }> {
+  const headers = new Headers({ "Content-Type": "application/json" });
+  if (requestHeaderFallback) {
+    headers.set("X-Pepe-Session-Fallback", "telegram-desktop");
+  }
   const response = await fetch(`${API_BASE}/auth/telegram/session`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     credentials: "include",
     body: JSON.stringify({ init_data: initData }),
   });
   await requireSuccess(response);
-  const sessionToken = response.headers.get(SESSION_TOKEN_HEADER)?.trim();
-  if (!sessionToken) {
+  const sessionToken = response.headers.get(SESSION_TOKEN_HEADER)?.trim() || null;
+  if (requestHeaderFallback && !sessionToken) {
     throw new ApiError(
       "Session fallback header is missing.",
       response.status,

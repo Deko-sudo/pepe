@@ -17,7 +17,7 @@ from app.modules.sessions.service import (
     revoke_presented_session,
     utc_now,
 )
-from app.modules.sessions.transport import SESSION_FALLBACK_HEADER
+from app.modules.sessions.transport import SESSION_FALLBACK_HEADER, session_fallback_requested
 from app.modules.users.service import get_user_by_telegram_id, upsert_telegram_user
 from app.schemas.auth import (
     TelegramValidateRequest,
@@ -72,7 +72,7 @@ async def validate_telegram_init_data_endpoint(
         200: {
             "headers": {
                 SESSION_FALLBACK_HEADER: {
-                    "description": "In-memory fallback session for embedded clients.",
+                    "description": ("Conditional in-memory session fallback for Telegram Desktop."),
                     "schema": {"type": "string"},
                 },
             },
@@ -104,7 +104,8 @@ async def exchange_telegram_session(
         now=now,
     )
     set_session_cookie(response, token=token, expires_at=session.expires_at)
-    response.headers[SESSION_FALLBACK_HEADER] = token
+    if session_fallback_requested(request.headers):
+        response.headers[SESSION_FALLBACK_HEADER] = token
     response.headers["Cache-Control"] = "no-store"
     profile = UserProfile.model_validate(user)
     return profile

@@ -63,7 +63,10 @@ export function TelegramProvider({ children }: TelegramProviderProps) {
 
       try {
         clearSessionToken();
-        const exchange = await exchangeTelegramSession(initData);
+        const exchange = await exchangeTelegramSession(
+          initData,
+          bridge.requiresSessionHeaderFallback(),
+        );
         let sessionUser: TelegramUser;
         try {
           sessionUser = await getCurrentUser();
@@ -71,7 +74,11 @@ export function TelegramProvider({ children }: TelegramProviderProps) {
           if (!(cookieError instanceof ApiError) || cookieError.status !== 401) {
             throw cookieError;
           }
-          activateSessionToken(exchange.sessionToken);
+          const fallbackToken = exchange.sessionToken;
+          if (!fallbackToken) {
+            throw cookieError;
+          }
+          activateSessionToken(fallbackToken);
           try {
             sessionUser = await getCurrentUser();
           } catch (headerError) {

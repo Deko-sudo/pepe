@@ -158,13 +158,7 @@ async function capture(page, filename) {
   await page.screenshot({ path: path.join(outputDirectory, filename), animations: "disabled" });
 }
 
-async function main() {
-  await mkdir(outputDirectory, { recursive: true });
-  const browser = await chromium.launch({
-    ...(await resolveLaunchOptions()),
-    headless: true,
-    args: ["--disable-dev-shm-usage"],
-  });
+async function captureEvidence(browser) {
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
     deviceScaleFactor: 1,
@@ -320,7 +314,6 @@ async function main() {
   ];
   const seriesVerified = requiredSeries.every((series) => requestedSeries.has(series));
 
-  await browser.close();
   console.log(`screenshots=${screenshots.join(",")}`);
   console.log(`runtime_errors=${runtimeErrors.length}`);
   console.log(`series_verified=${seriesVerified}`);
@@ -335,6 +328,20 @@ async function main() {
     || navigationObscuresContent
     || !Object.values(iconState).every(Boolean) || !aiModalUsable) {
     process.exitCode = 1;
+  }
+}
+
+async function main() {
+  await mkdir(outputDirectory, { recursive: true });
+  const browser = await chromium.launch({
+    ...(await resolveLaunchOptions()),
+    headless: true,
+    args: ["--disable-dev-shm-usage"],
+  });
+  try {
+    await captureEvidence(browser);
+  } finally {
+    await browser.close();
   }
 }
 

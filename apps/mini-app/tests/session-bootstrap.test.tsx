@@ -6,12 +6,13 @@ import { clearSessionToken } from "../src/shared/api";
 import { TelegramProvider } from "../src/shared/telegram/provider";
 import { useTelegramAuth } from "../src/shared/telegram/context";
 
-function installMockWebApp(initData: string) {
+function installMockWebApp(initData: string, platform = "tdesktop") {
   (window as Record<string, unknown>).Telegram = {
     WebApp: {
       ready: vi.fn(),
       expand: vi.fn(),
       initData,
+      platform,
       colorScheme: "dark" as const,
       themeParams: {},
       BackButton: { show: vi.fn(), hide: vi.fn(), onClick: vi.fn(), offClick: vi.fn() },
@@ -95,6 +96,23 @@ describe("session bootstrap", () => {
       "/api/v1/auth/telegram/session",
       expect.objectContaining({ credentials: "include" }),
     );
+    const exchangeHeaders = new Headers(fetchSpy.mock.calls[1][1]?.headers);
+    expect(exchangeHeaders.get("X-Pepe-Session-Fallback")).toBe("telegram-desktop");
+  });
+
+  it("does not request the bearer fallback on Telegram Android", async () => {
+    installMockWebApp("signed-init-data", "android");
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(profile), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(profile), { status: 200 }));
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("valid:Test"));
+    const exchangeHeaders = new Headers(fetchSpy.mock.calls[1][1]?.headers);
+    expect(exchangeHeaders.has("X-Pepe-Session-Fallback")).toBe(false);
   });
 
   it("activates a header session when Telegram Desktop rejects the cookie", async () => {
@@ -114,13 +132,9 @@ describe("session bootstrap", () => {
     renderProvider();
 
     await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("valid:Test"));
-    expect(fetchSpy).toHaveBeenNthCalledWith(
-      4,
-      "/api/v1/users/me",
-      expect.objectContaining({
-        headers: { Authorization: "Bearer desktop-session-token" },
-      }),
-    );
+    expect(fetchSpy.mock.calls[3][0]).toBe("/api/v1/users/me");
+    const fallbackHeaders = new Headers(fetchSpy.mock.calls[3][1]?.headers);
+    expect(fallbackHeaders.get("Authorization")).toBe("Bearer desktop-session-token");
   });
 
   it("keeps browser mode controlled after an unauthenticated session check", async () => {

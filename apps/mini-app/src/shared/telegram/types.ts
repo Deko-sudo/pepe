@@ -4,6 +4,7 @@ export interface TelegramBridge {
   ready(): void;
   expand(): void;
   getInitData(): string;
+  requiresSessionHeaderFallback(): boolean;
   getColorScheme(): "light" | "dark";
   showBackButton(): void;
   hideBackButton(): void;

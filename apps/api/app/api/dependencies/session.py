@@ -47,7 +47,7 @@ async def require_current_session(
         idle_ttl_seconds=settings.session_idle_ttl_seconds,
         now=utc_now(),
     )
-    logger.info(
+    logger.debug(
         "session_authentication source=%s authorization_header_present=%s "
         "cookie_present=%s recognized=%s",
         source,

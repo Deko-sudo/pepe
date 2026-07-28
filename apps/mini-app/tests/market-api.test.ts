@@ -90,12 +90,9 @@ describe("market API client", () => {
 
     await getQuotes(["btc-usdt"]);
 
-    expect(fetchSpy).toHaveBeenCalledWith(
-      "/api/v1/assets/quotes?slug=btc-usdt",
-      {
-        credentials: "include",
-        headers: { Authorization: expect.stringContaining("desktop-session-token") },
-      },
-    );
+    expect(fetchSpy.mock.calls[0][0]).toBe("/api/v1/assets/quotes?slug=btc-usdt");
+    expect(fetchSpy.mock.calls[0][1]).toEqual(expect.objectContaining({ credentials: "include" }));
+    const headers = new Headers(fetchSpy.mock.calls[0][1]?.headers);
+    expect(headers.get("Authorization")).toContain("desktop-session-token");
   });
 });

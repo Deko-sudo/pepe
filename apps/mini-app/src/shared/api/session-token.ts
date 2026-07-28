@@ -16,11 +16,7 @@ export function withSessionAuth(init: RequestInit = {}): RequestInit {
     return requestInit;
   }
 
-  return {
-    ...requestInit,
-    headers: {
-      ...(init.headers as Record<string, string> | undefined),
-      Authorization: `${SESSION_AUTH_SCHEME} ${activeSessionToken}`,
-    },
-  };
+  const headers = new Headers(init.headers);
+  headers.set("Authorization", `${SESSION_AUTH_SCHEME} ${activeSessionToken}`);
+  return { ...requestInit, headers };
 }

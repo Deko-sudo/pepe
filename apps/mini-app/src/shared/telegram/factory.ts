@@ -7,6 +7,7 @@ declare global {
         ready(): void;
         expand(): void;
         initData: string;
+        platform?: string;
         colorScheme: "light" | "dark";
         themeParams: {
           bg_color?: string;
@@ -69,6 +70,14 @@ class TelegramWebAppBridge implements TelegramBridge {
       return getWebApp().initData ?? "";
     } catch {
       return "";
+    }
+  }
+
+  requiresSessionHeaderFallback(): boolean {
+    try {
+      return getWebApp().platform === "tdesktop";
+    } catch {
+      return false;
     }
   }
 
@@ -137,6 +146,9 @@ class BrowserMockBridge implements TelegramBridge {
   expand(): void {}
   getInitData(): string {
     return "";
+  }
+  requiresSessionHeaderFallback(): boolean {
+    return false;
   }
   getColorScheme(): "light" | "dark" {
     return "dark";
