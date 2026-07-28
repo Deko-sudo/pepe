@@ -1,7 +1,10 @@
 import { z } from "zod";
+import { DECIMAL_PATTERN } from "@/shared/lib/decimal";
 import { ApiError } from "./client";
 
 const API_BASE = "/api/v1";
+const DecimalSchema = z.string().regex(DECIMAL_PATTERN);
+const NullableDecimalSchema = DecimalSchema.nullable();
 
 export const TimeframeSchema = z.enum(["1m", "5m", "15m", "1h", "4h", "1d"]);
 export type Timeframe = z.infer<typeof TimeframeSchema>;
@@ -17,10 +20,10 @@ export type Asset = z.infer<typeof AssetSchema>;
 export const CatalogSchema = z.object({ items: z.array(AssetSchema), next_cursor: z.string().nullable() });
 
 export const QuoteSchema = z.object({
-  slug: z.string(), price: z.string(), bid: z.string().nullable(), ask: z.string().nullable(), mid: z.string().nullable(),
-  open_24h: z.string().nullable(), high_24h: z.string().nullable(), low_24h: z.string().nullable(),
-  change_24h: z.string().nullable(), change_percent_24h: z.string().nullable(),
-  base_volume_24h: z.string().nullable(), quote_volume_24h: z.string().nullable(),
+  slug: z.string(), price: DecimalSchema, bid: NullableDecimalSchema, ask: NullableDecimalSchema, mid: NullableDecimalSchema,
+  open_24h: NullableDecimalSchema, high_24h: NullableDecimalSchema, low_24h: NullableDecimalSchema,
+  change_24h: NullableDecimalSchema, change_percent_24h: NullableDecimalSchema,
+  base_volume_24h: NullableDecimalSchema, quote_volume_24h: NullableDecimalSchema,
   market_status: z.string(), data_status: z.string(), observed_at: z.string(), received_at: z.string(), age_seconds: z.number(),
   provenance: z.object({ source_label: z.string(), venue_label: z.string().nullable(), market_type: z.string(), price_type: z.string(), delay_class: z.string() }),
 }).passthrough();
@@ -28,8 +31,8 @@ export type Quote = z.infer<typeof QuoteSchema>;
 export const QuoteBatchSchema = z.object({ items: z.array(QuoteSchema), unavailable: z.array(z.string()), not_found: z.array(z.string()) });
 
 export const CandleSchema = z.object({
-  open_time: z.string(), close_time: z.string(), open: z.string(), high: z.string(), low: z.string(), close: z.string(),
-  base_volume: z.string().nullable(), quote_volume: z.string().nullable(), trade_count: z.number().int().nullable(),
+  open_time: z.string(), close_time: z.string(), open: DecimalSchema, high: DecimalSchema, low: DecimalSchema, close: DecimalSchema,
+  base_volume: NullableDecimalSchema, quote_volume: NullableDecimalSchema, trade_count: z.number().int().nullable(),
   source_label: z.string(), venue_label: z.string().nullable(), received_at: z.string(),
 }).passthrough();
 export type Candle = z.infer<typeof CandleSchema>;

@@ -72,7 +72,7 @@ select:focus-visible {
   height: 5px;
   flex: 0 0 auto;
   border-radius: 999px;
-  background: currentColor;
+  background: currentcolor;
 }
 
 .market-hero,
@@ -130,7 +130,7 @@ select:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  border: 1px solid currentColor;
+  border: 1px solid currentcolor;
   border-radius: 999px;
   padding: 5px 8px;
   font-size: 9px;
@@ -242,7 +242,7 @@ select:focus-visible {
   color: var(--color-accent-secondary);
 }
 
-.context-icon svg { width: 25px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
+.context-icon svg { width: 25px; fill: none; stroke: currentcolor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
 .context-copy { min-width: 0; flex: 1; }
 .context-copy strong { display: block; margin-top: 2px; font-size: 14px; }
 .context-copy p { margin-top: 3px; color: var(--color-text-muted); font-size: 10px; line-height: 1.45; }

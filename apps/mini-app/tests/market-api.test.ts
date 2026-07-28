@@ -41,6 +41,27 @@ describe("market API client", () => {
     expect(Object.keys(CandleSchema.shape)).toEqual(expect.arrayContaining(["base_volume", "quote_volume", "trade_count"]));
   });
 
+  it.each(["", ".5", "1e3", "123.", "not-a-number"])(
+    "rejects non-canonical decimal payload %j at the schema boundary",
+    (value) => {
+      expect(QuoteSchema.safeParse({ ...quote, price: value }).success).toBe(false);
+      expect(CandleSchema.safeParse({
+        open_time: "2026-01-01T00:00:00Z",
+        close_time: "2026-01-01T01:00:00Z",
+        open: value,
+        high: "2",
+        low: "1",
+        close: "1.5",
+        base_volume: null,
+        quote_volume: null,
+        trade_count: null,
+        source_label: "Synthetic test source",
+        venue_label: null,
+        received_at: "2026-01-01T01:00:00Z",
+      }).success).toBe(false);
+    },
+  );
+
   it("requests a credentialed quote batch with repeated slug parameters", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ items: [quote], unavailable: [], not_found: [] }), {

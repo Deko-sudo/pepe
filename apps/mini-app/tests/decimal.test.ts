@@ -53,6 +53,9 @@ describe("precision-safe decimal presentation", () => {
   });
 
   it("formats signed decimal changes without floating-point conversion", () => {
+    expect(formatDecimal("123.456", 2)).toBe("123.46");
+    expect(formatDecimal("999.995", 2)).toBe("1 000");
+    expect(formatDecimal("-1.235", 2)).toBe("−1.24");
     expect(formatSignedDecimal("1.6900", 2)).toBe("+1.69");
     expect(formatSignedDecimal("-0.2500", 2)).toBe("−0.25");
     expect(formatSignedDecimal("0.0000", 2)).toBe("0");

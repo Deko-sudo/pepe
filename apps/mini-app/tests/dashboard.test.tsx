@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useNavigate } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Dashboard } from "../src/pages/dashboard";
@@ -58,12 +58,18 @@ const candles = [
   { open_time: "2026-07-28T07:00:00Z", close_time: "2026-07-28T08:00:00Z", open: "118000.00", high: "120000.00", low: "117500.00", close: "119000.00", source_label: "Synthetic historical candle source", venue_label: null, received_at: "2026-07-28T08:00:01Z" },
 ];
 
+function HashNavigationProbe() {
+  const navigate = useNavigate();
+  return <button onClick={() => navigate("/#session-card")}>Open session hash</button>;
+}
+
 function renderDashboard() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const view = render(
     <QueryClientProvider client={client}>
       <MemoryRouter>
         <Dashboard />
+        <HashNavigationProbe />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -131,6 +137,25 @@ describe("Stage 8 home dashboard", () => {
     fireEvent.click(screen.getByRole("button", { name: "5m" }));
 
     await waitFor(() => expect(api.getCandles).toHaveBeenLastCalledWith("eth-usdt", "5m"));
+  });
+
+  it("scrolls the session card when the route hash changes after mount", async () => {
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(Element.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView,
+    });
+    try {
+      renderDashboard();
+      await screen.findAllByText("119 000");
+      scrollIntoView.mockClear();
+
+      fireEvent.click(screen.getByRole("button", { name: "Open session hash" }));
+
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: "center" }));
+    } finally {
+      delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    }
   });
 
   it("moves candle requests back to an available instrument after a catalog refresh", async () => {

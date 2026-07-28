@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -61,8 +61,14 @@ describe("AI Support Modal", () => {
 
   it("closes modal when Понятно is clicked", async () => {
     renderDashboard();
-    fireEvent.click(await screen.findByRole("button", { name: "Открыть AI-поддержку" }));
+    await screen.findAllByText("119 000");
+    const trigger = screen.getByRole("button", { name: "Открыть AI-поддержку" });
+    trigger.focus();
+    expect(trigger).toHaveFocus();
+    fireEvent.click(trigger);
+    await waitFor(() => expect(screen.getByRole("dialog")).toHaveFocus());
     fireEvent.click(screen.getByText("Понятно"));
     expect(screen.queryByText(/Раздел находится в разработке/)).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Открыть AI-поддержку" })).toHaveFocus());
   });
 });

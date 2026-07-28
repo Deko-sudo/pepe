@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
@@ -11,7 +11,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 import {
   getAssets,
@@ -135,7 +135,7 @@ function HeroCard({ asset, quote, stats, timeframe, loading, unavailable, error,
   const low = hasQuoteRange ? quote.low_24h : stats?.low;
   const rangeLabel = hasQuoteRange ? "24 ч" : timeframe;
   return (
-    <section className="market-hero enter-card" aria-live="polite">
+    <section className="market-hero enter-card">
       <div className="hero-geometry" aria-hidden="true"><i /><i /><i /></div>
       <header className="hero-head">
         <div className="asset-identity">
@@ -150,7 +150,7 @@ function HeroCard({ asset, quote, stats, timeframe, loading, unavailable, error,
         </span>
       </header>
 
-      <div className="hero-price-wrap">
+      <div className="hero-price-wrap" aria-live="polite">
         <span className="eyebrow">Текущая цена</span>
         {loading ? <span className="home-skeleton skeleton-price" /> : quote ? (
           <strong className="hero-price number-change">{formatDecimal(quote.price, asset.price_precision)}</strong>
@@ -300,6 +300,7 @@ function ChartCard({ assets, selected, selectedSlug, onSelect, timeframe, onTime
 
 function InformationCards({ asset }: { asset: Asset }) {
   const { aiSupportOpen, openAiSupport, closeAiSupport } = useModalStore();
+  const aiSupportButtonRef = useRef<HTMLButtonElement>(null);
   const continuous = asset.calendar_kind === "always_open" || asset.trading_calendar === "crypto-24x7";
   return (
     <div className="info-grid">
@@ -307,12 +308,12 @@ function InformationCards({ asset }: { asset: Asset }) {
         <span className="info-icon" aria-hidden="true"><Clock3 size={21} strokeWidth={1.6} /></span>
         <div><span className="section-kicker">{asset.timezone}</span><h2 id="session-title">Торговая сессия</h2><strong>{continuous ? "Круглосуточный рынок" : asset.trading_calendar}</strong><p>Информационный календарь инструмента без оценки влияния на рынок.</p></div>
       </section>
-      <button id="ai-support" className="info-card ai-card enter-card" onClick={openAiSupport} type="button" aria-haspopup="dialog" aria-label="Открыть AI-поддержку">
+      <button ref={aiSupportButtonRef} id="ai-support" className="info-card ai-card enter-card" onClick={openAiSupport} type="button" aria-haspopup="dialog" aria-label="Открыть AI-поддержку">
         <span className="ai-mark" aria-hidden="true">AI<Sparkles size={12} /></span>
         <div><span className="section-kicker">Beta</span><h2>AI-поддержка</h2><strong>Справочный раздел</strong><p>Навигация по возможностям Pepe. Рыночные выводы не формируются.</p></div>
         <ChevronRight className="info-chevron" size={17} aria-hidden="true" />
       </button>
-      <Modal isOpen={aiSupportOpen} onClose={closeAiSupport} title="AI-поддержка · Beta">
+      <Modal isOpen={aiSupportOpen} onClose={closeAiSupport} title="AI-поддержка · Beta" returnFocusRef={aiSupportButtonRef}>
         <p className="text-sm leading-relaxed text-text-secondary">Раздел находится в разработке. Сейчас Pepe показывает только фактические рыночные данные и не формирует торговые рекомендации.</p>
       </Modal>
     </div>
@@ -320,6 +321,7 @@ function InformationCards({ asset }: { asset: Asset }) {
 }
 
 export function MarketHome() {
+  const location = useLocation();
   const { state } = useTelegramAuth();
   const canLoadMarket = state === "valid";
   const [selectedSlug, setSelectedSlug] = useState("");
@@ -340,11 +342,11 @@ export function MarketHome() {
   }, [activeSlug, selectedSlug]);
 
   useEffect(() => {
-    const targetId = window.location.hash.slice(1);
+    const targetId = location.hash.slice(1);
     if (!targetId || !trackedAssets.length) return;
     const frame = window.requestAnimationFrame(() => document.getElementById(targetId)?.scrollIntoView({ block: "center" }));
     return () => window.cancelAnimationFrame(frame);
-  }, [trackedAssets]);
+  }, [location.hash, trackedAssets]);
 
   const slugs = trackedAssets.map((asset) => asset.slug);
   const quotes = useQuery({

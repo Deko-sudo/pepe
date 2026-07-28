@@ -1,6 +1,6 @@
 import type { Candle } from "@/shared/api/market";
 
-const DECIMAL_PATTERN = /^([+-]?)(\d+)(?:\.(\d+))?$/;
+export const DECIMAL_PATTERN = /^([+-]?)(\d+)(?:\.(\d+))?$/;
 
 function decimalParts(value: string) {
   const match = DECIMAL_PATTERN.exec(value);
@@ -34,9 +34,24 @@ export function scaledToDecimal(value: bigint, scale: number): string {
 }
 
 export function formatDecimal(value: string, maxFractionDigits = 8): string {
-  const { negative, whole, fraction } = decimalParts(value);
+  if (!Number.isInteger(maxFractionDigits) || maxFractionDigits < 0) {
+    throw new Error(`Invalid fraction digit limit: ${maxFractionDigits}`);
+  }
+
+  const parsed = decimalParts(value);
+  let roundedValue = value;
+  if (parsed.fraction.length > maxFractionDigits) {
+    const droppedDigits = parsed.fraction.length - maxFractionDigits;
+    const divisor = 10n ** BigInt(droppedDigits);
+    const scaled = decimalToScaled(value, parsed.fraction.length);
+    const absolute = scaled < 0n ? -scaled : scaled;
+    const roundedAbsolute = (absolute + divisor / 2n) / divisor;
+    roundedValue = scaledToDecimal(scaled < 0n ? -roundedAbsolute : roundedAbsolute, maxFractionDigits);
+  }
+
+  const { negative, whole, fraction } = decimalParts(roundedValue);
   const groupedWhole = whole.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-  const visibleFraction = fraction.slice(0, maxFractionDigits).replace(/0+$/, "");
+  const visibleFraction = fraction.replace(/0+$/, "");
   return `${negative ? "−" : ""}${groupedWhole}${visibleFraction ? `.${visibleFraction}` : ""}`;
 }
 
