@@ -12,7 +12,9 @@ describe("BottomNav", () => {
     renderWithRouter(<BottomNav />);
     expect(screen.getByText("Главная")).toBeInTheDocument();
     expect(screen.getByText("Рынки")).toBeInTheDocument();
+    expect(screen.getByText("Сессия")).toBeInTheDocument();
     expect(screen.getByText("Сводки")).toBeInTheDocument();
     expect(screen.getByText("Настройки")).toBeInTheDocument();
+    expect(screen.getAllByRole("link")).toHaveLength(5);
   });
 });

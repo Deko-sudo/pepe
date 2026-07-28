@@ -1,29 +1,68 @@
-import { describe, it, expect } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
-import { BrowserRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { Dashboard } from "../src/pages/dashboard";
 
-function renderWithRouter(ui: React.ReactNode) {
-  return render(<BrowserRouter>{ui}</BrowserRouter>);
+const api = vi.hoisted(() => ({
+  getAssets: vi.fn(),
+  getCandles: vi.fn(),
+  getQuotes: vi.fn(),
+}));
+
+vi.mock("../src/shared/telegram", () => ({
+  useTelegramAuth: () => ({ state: "valid" }),
+}));
+
+vi.mock("../src/shared/api/market", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../src/shared/api/market")>()),
+  ...api,
+}));
+
+function renderDashboard() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter><Dashboard /></MemoryRouter>
+    </QueryClientProvider>,
+  );
 }
 
+beforeEach(() => {
+  api.getAssets.mockResolvedValue({
+    items: [{
+      id: "00000000-0000-4000-8000-000000000001", slug: "btc-usdt", symbol: "BTC/USDT", display_name: "Bitcoin",
+      asset_class: "crypto", market_type: "spot", base_asset: "BTC", quote_asset: "USDT", price_precision: 2,
+      quantity_precision: 8, timezone: "UTC", calendar_kind: "continuous", trading_calendar: "24x7",
+      metadata_version: 1, is_enabled: true,
+    }],
+    next_cursor: null,
+  });
+  api.getQuotes.mockResolvedValue({
+    items: [{
+      slug: "btc-usdt", price: "119000.00", bid: null, ask: null, mid: null, market_status: "open",
+      data_status: "fresh", observed_at: "2026-07-28T05:00:00Z", received_at: "2026-07-28T05:00:01Z", age_seconds: 1,
+      provenance: { source_label: "Synthetic test source", venue_label: null, market_type: "spot", price_type: "last", delay_class: "demo" },
+    }],
+    unavailable: [],
+    not_found: [],
+  });
+  api.getCandles.mockResolvedValue({ timeframe: "1h", items: [] });
+});
+
 describe("AI Support Modal", () => {
-  it("opens modal when AI Support button is clicked", () => {
-    renderWithRouter(<Dashboard />);
-    const aiButton = screen.getAllByText("AI Support")[0];
-    fireEvent.click(aiButton);
-    expect(
-      screen.getByText("Ожидайте, функция находится в разработке.")
-    ).toBeInTheDocument();
+  it("opens modal from the neutral Stage 8 presentation card", async () => {
+    renderDashboard();
+    fireEvent.click(await screen.findByRole("button", { name: "Открыть AI-поддержку" }));
+    expect(screen.getByRole("dialog", { name: "AI-поддержка · Beta" })).toBeInTheDocument();
+    expect(screen.getByText(/Раздел находится в разработке/)).toBeInTheDocument();
   });
 
-  it("closes modal when Понятно is clicked", () => {
-    renderWithRouter(<Dashboard />);
-    const aiButton = screen.getAllByText("AI Support")[0];
-    fireEvent.click(aiButton);
+  it("closes modal when Понятно is clicked", async () => {
+    renderDashboard();
+    fireEvent.click(await screen.findByRole("button", { name: "Открыть AI-поддержку" }));
     fireEvent.click(screen.getByText("Понятно"));
-    expect(
-      screen.queryByText("Ожидайте, функция находится в разработке.")
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Раздел находится в разработке/)).not.toBeInTheDocument();
   });
 });

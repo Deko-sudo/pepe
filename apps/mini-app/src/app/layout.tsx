@@ -4,9 +4,9 @@ import { BottomNav } from "@/features/navigation/bottom-nav";
 
 export function AppLayout() {
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex h-[100dvh] flex-col overflow-hidden">
       <AuthBanner />
-      <main className="flex-1 pb-16"><Outlet /></main>
+      <main className="min-h-0 flex-1 overflow-y-auto pb-24"><Outlet /></main>
       <BottomNav />
     </div>
   );

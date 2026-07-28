@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from "react";
+import React, { useCallback, useEffect, useId } from "react";
 
 interface ModalProps {
   isOpen: boolean;
@@ -8,6 +8,7 @@ interface ModalProps {
 }
 
 export function Modal({ isOpen, onClose, title, children }: ModalProps) {
+  const titleId = useId();
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -26,10 +27,15 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="fixed inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative z-10 mx-4 w-full max-w-sm rounded-[20px] bg-surface-elevated p-6">
+      <div className="fixed inset-0 bg-black/60" onClick={onClose} aria-hidden="true" />
+      <div
+        className="relative z-10 mx-4 w-full max-w-sm rounded-[20px] bg-surface-elevated p-6"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
+      >
         {title && (
-          <h2 className="mb-4 text-lg font-semibold text-text-primary">
+          <h2 id={titleId} className="mb-4 text-lg font-semibold text-text-primary">
             {title}
           </h2>
         )}

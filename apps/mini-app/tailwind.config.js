@@ -6,17 +6,17 @@ export default {
     extend: {
       colors: {
         bg: {
-          primary: "#090b10",
-          secondary: "#0f131d",
+          primary: "#05070a",
+          secondary: "#090d13",
         },
         surface: {
-          primary: "#141925",
-          secondary: "#1a2030",
-          elevated: "#202738",
+          primary: "#0d121a",
+          secondary: "#111823",
+          elevated: "#182130",
         },
         border: {
           subtle: "rgba(255, 255, 255, 0.08)",
-          active: "rgba(124, 92, 252, 0.65)",
+          active: "rgba(57, 139, 255, 0.72)",
         },
         text: {
           primary: "#f5f7fb",
@@ -24,10 +24,10 @@ export default {
           muted: "#70798a",
         },
         accent: {
-          primary: "#7c5cfc",
-          secondary: "#25c7f8",
+          primary: "#398bff",
+          secondary: "#65a7ff",
         },
-        positive: "#21c77a",
+        positive: "#35df8d",
         negative: "#f05252",
         warning: "#f5a524",
       },
