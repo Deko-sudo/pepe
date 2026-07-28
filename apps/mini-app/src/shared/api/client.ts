@@ -1,18 +1,19 @@
-import {
-  TelegramValidateResponseSchema,
-  UserProfileSchema,
-} from "./types";
+import { TelegramValidateResponseSchema, UserProfileSchema } from "./types";
 import type { TelegramValidateResponse, UserProfile } from "./types";
+import { clearSessionToken, withSessionAuth } from "./session-token";
 
 const API_BASE = "/api/v1";
+const SESSION_TOKEN_HEADER = "X-Pepe-Session-Token";
 
 export class ApiError extends Error {
-  constructor(
-    message: string,
-    public status: number,
-  ) {
+  readonly status: number;
+  readonly code?: string;
+
+  constructor(message: string, status: number, code?: string) {
     super(message);
     this.name = "ApiError";
+    this.status = status;
+    this.code = code;
   }
 }
 
@@ -53,12 +54,14 @@ export async function validateTelegramInitData(
 }
 
 export async function getCurrentUser(): Promise<UserProfile> {
-  const response = await fetch(`${API_BASE}/users/me`, { credentials: "include" });
+  const response = await fetch(`${API_BASE}/users/me`, withSessionAuth());
   await requireSuccess(response);
   return UserProfileSchema.parse(await response.json());
 }
 
-export async function exchangeTelegramSession(initData: string): Promise<UserProfile> {
+export async function exchangeTelegramSession(
+  initData: string,
+): Promise<{ user: UserProfile; sessionToken: string }> {
   const response = await fetch(`${API_BASE}/auth/telegram/session`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -66,15 +69,26 @@ export async function exchangeTelegramSession(initData: string): Promise<UserPro
     body: JSON.stringify({ init_data: initData }),
   });
   await requireSuccess(response);
-  return UserProfileSchema.parse(await response.json());
+  const sessionToken = response.headers.get(SESSION_TOKEN_HEADER)?.trim();
+  if (!sessionToken) {
+    throw new ApiError(
+      "Session fallback header is missing.",
+      response.status,
+      "SESSION_HEADER_MISSING",
+    );
+  }
+  return {
+    user: UserProfileSchema.parse(await response.json()),
+    sessionToken,
+  };
 }
 
 async function endSession(path: string): Promise<void> {
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(`${API_BASE}${path}`, withSessionAuth({
     method: "POST",
-    credentials: "include",
-  });
+  }));
   await requireSuccess(response);
+  clearSessionToken();
 }
 
 export async function logout(): Promise<void> {

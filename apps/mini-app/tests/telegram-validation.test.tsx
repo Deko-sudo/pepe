@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 
-import { ApiError, getCurrentUser } from "../src/shared/api";
+import { ApiError, clearSessionToken, getCurrentUser } from "../src/shared/api";
 import { TelegramProvider } from "../src/shared/telegram/provider";
 import { useTelegramAuth } from "../src/shared/telegram/context";
 
@@ -48,6 +48,7 @@ const profile = {
 };
 
 afterEach(() => {
+  clearSessionToken();
   delete (window as Record<string, unknown>).Telegram;
   vi.restoreAllMocks();
 });
@@ -69,6 +70,12 @@ describe("Telegram session bootstrap", () => {
     installMockWebApp("signed-init-data");
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(profile), {
+          status: 200,
+          headers: { "X-Pepe-Session-Token": "desktop-session-token" },
+        }),
+      )
       .mockResolvedValueOnce(new Response(JSON.stringify(profile), { status: 200 }));
 
     renderProvider();
@@ -92,6 +99,12 @@ describe("Telegram session bootstrap", () => {
     installMockWebApp("query_id=123&hash=abc");
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(profile), {
+          status: 200,
+          headers: { "X-Pepe-Session-Token": "desktop-session-token" },
+        }),
+      )
       .mockResolvedValueOnce(new Response(JSON.stringify(profile), { status: 200 }));
 
     renderProvider();

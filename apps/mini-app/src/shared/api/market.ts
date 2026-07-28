@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { DECIMAL_PATTERN } from "@/shared/lib/decimal";
 import { ApiError } from "./client";
+import { withSessionAuth } from "./session-token";
 
 const API_BASE = "/api/v1";
 const DecimalSchema = z.string().regex(DECIMAL_PATTERN);
@@ -40,7 +41,7 @@ export const CandlesSchema = z.object({ timeframe: TimeframeSchema, items: z.arr
 
 async function request<T>(path: string, schema: z.ZodType<T>): Promise<T> {
   let response: Response;
-  try { response = await fetch(`${API_BASE}${path}`, { credentials: "include" }); }
+  try { response = await fetch(`${API_BASE}${path}`, withSessionAuth()); }
   catch { throw new ApiError("Network request failed", 0); }
   if (!response.ok) throw new ApiError(`HTTP ${response.status}`, response.status);
   return schema.parse(await response.json());

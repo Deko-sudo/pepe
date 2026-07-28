@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import {
   ApiError,
+  activateSessionToken,
+  clearSessionToken,
   exchangeTelegramSession,
   getCurrentUser,
   logout as logoutRequest,
@@ -60,7 +62,23 @@ export function TelegramProvider({ children }: TelegramProviderProps) {
       }
 
       try {
-        const sessionUser = await exchangeTelegramSession(initData);
+        clearSessionToken();
+        const exchange = await exchangeTelegramSession(initData);
+        let sessionUser: TelegramUser;
+        try {
+          sessionUser = await getCurrentUser();
+        } catch (cookieError) {
+          if (!(cookieError instanceof ApiError) || cookieError.status !== 401) {
+            throw cookieError;
+          }
+          activateSessionToken(exchange.sessionToken);
+          try {
+            sessionUser = await getCurrentUser();
+          } catch (headerError) {
+            clearSessionToken();
+            throw headerError;
+          }
+        }
         setUser(sessionUser);
         setState("valid");
       } catch (exchangeError) {

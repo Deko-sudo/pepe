@@ -8,6 +8,7 @@ from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.db.session import close_db
+from app.modules.sessions.transport import SESSION_FALLBACK_HEADER
 
 
 @asynccontextmanager
@@ -31,6 +32,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=[SESSION_FALLBACK_HEADER],
 )
 
 app.include_router(api_router)

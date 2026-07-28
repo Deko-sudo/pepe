@@ -65,9 +65,35 @@ async def test_configured_session_origin_passes_credentialed_cors_preflight(
 
 
 @pytest.mark.asyncio
+async def test_session_token_header_is_exposed_to_cross_origin_clients(
+    client: AsyncClient,
+) -> None:
+    response = await client.get(
+        "/api/v1/ready",
+        headers={"Origin": "http://localhost:4000"},
+    )
+
+    exposed_headers = {
+        header.strip().casefold()
+        for header in response.headers["access-control-expose-headers"].split(",")
+    }
+    assert "x-pepe-session-token" in exposed_headers
+
+
+@pytest.mark.asyncio
 async def test_legacy_post_me_is_preserved_and_marked_deprecated(client: AsyncClient) -> None:
     schema = (await client.get("/openapi.json")).json()
     post_operation = schema["paths"]["/api/v1/users/me"]["post"]
 
     assert post_operation["deprecated"] is True
     assert "get" in schema["paths"]["/api/v1/users/me"]
+
+
+@pytest.mark.asyncio
+async def test_telegram_session_exchange_returns_header_fallback_token(
+    client: AsyncClient,
+) -> None:
+    schema = (await client.get("/openapi.json")).json()
+    success_response = schema["paths"]["/api/v1/auth/telegram/session"]["post"]["responses"]["200"]
+
+    assert "X-Pepe-Session-Token" in success_response["headers"]

@@ -20,6 +20,8 @@ x-api-environment: &api-environment
   SESSION_IDLE_TTL_SECONDS: "${SESSION_IDLE_TTL_SECONDS:-604800}"
   SESSION_MAX_ACTIVE: "${SESSION_MAX_ACTIVE:-5}"
   SESSION_COOKIE_SECURE: "${SESSION_COOKIE_SECURE:-false}"
+  SESSION_COOKIE_SAME_SITE: "${SESSION_COOKIE_SAME_SITE:-lax}"
+  SESSION_COOKIE_PARTITIONED: "${SESSION_COOKIE_PARTITIONED:-false}"
   SESSION_ALLOWED_ORIGINS: "${SESSION_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:4000,http://localhost:8080}"
 
 services:
@@ -28,6 +30,8 @@ services:
     build:
       context: ./apps/mini-app
       dockerfile: Dockerfile
+      args:
+        VITE_BUILD_ID: "${MINI_APP_BUILD_ID:-dev}"
     ports:
       - "${MINI_APP_PORT:-4000}:80"
     depends_on:
@@ -79,6 +83,7 @@ services:
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
       - MINI_APP_URL=${MINI_APP_URL:-http://localhost}
+      - MINI_APP_BUILD_ID=${MINI_APP_BUILD_ID:-dev}
     healthcheck:
       test: ["CMD", "python", "-c", "import os; os.kill(1, 0)"]
       interval: 10s

@@ -1,12 +1,19 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   ApiError,
+  activateSessionToken,
+  clearSessionToken,
   exchangeTelegramSession,
   getCurrentUser,
   logout,
   logoutAll,
 } from "../src/shared/api";
+
+afterEach(() => {
+  clearSessionToken();
+  vi.restoreAllMocks();
+});
 
 describe("session API client", () => {
   it("uses credentials include for cookie-session calls", async () => {
@@ -19,7 +26,10 @@ describe("session API client", () => {
           created_at: "2026-07-24T00:00:00Z",
           updated_at: "2026-07-24T00:00:00Z",
         }),
-        { status: 200 },
+        {
+          status: 200,
+          headers: { "X-Pepe-Session-Token": "desktop-session-token" },
+        },
       );
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(profileResponse);
 
@@ -49,6 +59,63 @@ describe("session API client", () => {
       "/api/v1/auth/logout-all",
       expect.objectContaining({ credentials: "include" }),
     );
+  });
+
+  it("uses an in-memory bearer token without browser persistence", async () => {
+    const profile = {
+      id: "11111111-1111-1111-1111-111111111111",
+      telegram_id: 1,
+      first_name: "Test",
+      created_at: "2026-07-24T00:00:00Z",
+      updated_at: "2026-07-24T00:00:00Z",
+    };
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(profile), {
+          status: 200,
+          headers: { "X-Pepe-Session-Token": "desktop-session-token" },
+        }),
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify(profile), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(profile), { status: 200 }));
+
+    const exchange = await exchangeTelegramSession("signed-init-data");
+    activateSessionToken(exchange.sessionToken);
+    await getCurrentUser();
+
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      2,
+      "/api/v1/users/me",
+      expect.objectContaining({
+        credentials: "include",
+        headers: { Authorization: "Bearer desktop-session-token" },
+      }),
+    );
+    clearSessionToken();
+    await getCurrentUser();
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      3,
+      "/api/v1/users/me",
+      { credentials: "include" },
+    );
+  });
+
+  it("classifies a successful exchange without the fallback header", async () => {
+    const profile = {
+      id: "11111111-1111-1111-1111-111111111111",
+      telegram_id: 1,
+      first_name: "Test",
+      created_at: "2026-07-24T00:00:00Z",
+      updated_at: "2026-07-24T00:00:00Z",
+    };
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(profile), { status: 200 }),
+    );
+
+    await expect(exchangeTelegramSession("signed-init-data")).rejects.toMatchObject<ApiError>({
+      code: "SESSION_HEADER_MISSING",
+    });
   });
 
   it("preserves status when an error body is empty or non-JSON", async () => {

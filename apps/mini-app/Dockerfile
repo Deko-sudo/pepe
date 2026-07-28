@@ -1,5 +1,8 @@
 FROM node:20-alpine AS builder
 
+ARG VITE_BUILD_ID=dev
+ENV VITE_BUILD_ID=${VITE_BUILD_ID}
+
 WORKDIR /app
 
 COPY package.json package-lock.json* ./

@@ -22,18 +22,26 @@ import {
   type Quote,
   type Timeframe,
 } from "@/shared/api/market";
+import {
+  BUILD_ID,
+  marketDiagnosticCode,
+  type DiagnosticCode,
+} from "@/shared/diagnostics";
 import { candleStatistics, formatDecimal, formatSignedDecimal } from "@/shared/lib/decimal";
 import { useModalStore } from "@/shared/lib/store";
 import { useTelegramAuth } from "@/shared/telegram";
 import { Modal } from "@/shared/ui/modal";
 
 import { AssetIcon } from "./asset-icon";
+import { normalizeCandles } from "./chart-data";
 import { MarketChart } from "./market-chart";
 
 const TRACKED_SLUGS = ["btc-usdt", "eth-usdt", "xau-usd"];
 
 function provenanceMode(sourceLabel?: string | null) {
-  return sourceLabel && /synthetic|fake|fixture|demo|test/i.test(sourceLabel) ? "DEMO" : "LIVE";
+  return sourceLabel && /^(synthetic|fake|fixture|demo|test)(?:\b|[-_ ])/i.test(sourceLabel)
+    ? "DEMO"
+    : "LIVE";
 }
 
 function freshnessText(quote: Quote) {
@@ -72,10 +80,12 @@ function DashboardSkeleton() {
 function BlockingState({
   title,
   message,
+  diagnosticCode,
   retry,
 }: {
   title: string;
   message: string;
+  diagnosticCode?: DiagnosticCode;
   retry?: () => void;
 }) {
   return (
@@ -84,6 +94,9 @@ function BlockingState({
         <span className="state-icon" aria-hidden="true"><AlertTriangle size={20} /></span>
         <h1>{title}</h1>
         <p>{message}</p>
+        {diagnosticCode ? (
+          <p className="state-diagnostic">Код: {diagnosticCode} · Сборка: {BUILD_ID}</p>
+        ) : null}
         {retry ? (
           <button className="retry-button" onClick={retry} type="button">
             <RefreshCw size={15} aria-hidden="true" />
@@ -188,8 +201,8 @@ function DataContext({ quote }: { quote?: Quote }) {
   const statusLabel = quote?.data_status === "stale" ? "Данные устарели" : quote ? "Данные актуальны" : "Данные недоступны";
   return (
     <section className="context-card enter-card" aria-labelledby="market-context-title">
-      <span className="context-icon" aria-hidden="true">
-        <svg viewBox="0 0 32 32"><path d="M5 22h5l4-8 5 5 4-10 4 5" /><path d="M23 9h4v4" /></svg>
+      <span className="context-icon" data-icon="market-status-activity" aria-hidden="true">
+        <Activity size={22} strokeWidth={1.7} />
       </span>
       <div className="context-copy">
         <span className="eyebrow" id="market-context-title">Состояние данных</span>
@@ -263,7 +276,7 @@ interface ChartCardProps {
 }
 
 function ChartCard({ assets, selected, selectedSlug, onSelect, timeframe, onTimeframe, candles, loading, error, retry }: ChartCardProps) {
-  const items = candles?.items ?? [];
+  const items = normalizeCandles(candles?.items ?? []);
   const stats = candleStatistics(items);
   const mode = provenanceMode(items[0]?.source_label);
   return (
@@ -272,16 +285,19 @@ function ChartCard({ assets, selected, selectedSlug, onSelect, timeframe, onTime
         <div><span className="section-kicker">PostgreSQL · свечи</span><h2 id="chart-title">Динамика цены</h2></div>
         <span className={`provenance-badge ${mode === "LIVE" ? "is-live" : "is-demo"}`}><i />{items.length ? mode : "—"}</span>
       </header>
-      <label className="instrument-select">
-        <span className="sr-only">Инструмент графика</span>
-        <select value={selectedSlug} onChange={(event) => onSelect(event.target.value)} aria-label="Инструмент графика">
-          {assets.map((asset) => <option key={asset.slug} value={asset.slug}>{asset.symbol}</option>)}
-        </select>
-      </label>
-      <div className="timeframe-tabs" aria-label="Таймфрейм графика">
-        {TIMEFRAMES.map((item) => (
-          <button key={item} type="button" className={item === timeframe ? "is-active" : ""} onClick={() => onTimeframe(item)} aria-pressed={item === timeframe}>{item}</button>
-        ))}
+      <div className="chart-controls">
+        <label className="instrument-select">
+          <AssetIcon asset={selected.base_asset ?? selected.symbol.split("/")[0] ?? selected.symbol} label={`${selected.display_name} на графике`} size="sm" />
+          <span className="sr-only">Инструмент графика</span>
+          <select value={selectedSlug} onChange={(event) => onSelect(event.target.value)} aria-label="Инструмент графика">
+            {assets.map((asset) => <option key={asset.slug} value={asset.slug}>{asset.symbol}</option>)}
+          </select>
+        </label>
+        <div className="timeframe-tabs" aria-label="Таймфрейм графика">
+          {TIMEFRAMES.map((item) => (
+            <button key={item} type="button" className={item === timeframe ? "is-active" : ""} onClick={() => onTimeframe(item)} aria-pressed={item === timeframe}>{item}</button>
+          ))}
+        </div>
       </div>
       <div className="chart-stage">
         {loading ? <div className="home-skeleton skeleton-chart-inner" /> : error ? (
@@ -326,7 +342,13 @@ export function MarketHome() {
   const canLoadMarket = state === "valid";
   const [selectedSlug, setSelectedSlug] = useState("");
   const [timeframe, setTimeframe] = useState<Timeframe>("1h");
-  const catalog = useQuery({ queryKey: ["home-assets"], queryFn: getAssets, enabled: canLoadMarket });
+  const catalog = useQuery({
+    queryKey: ["home-assets"],
+    queryFn: getAssets,
+    enabled: canLoadMarket,
+    refetchOnWindowFocus: "always",
+    refetchOnReconnect: "always",
+  });
   const trackedAssets = useMemo(() => {
     const items = catalog.data?.items ?? [];
     const preferred = TRACKED_SLUGS.map((slug) => items.find((item) => item.slug === slug)).filter((item): item is Asset => Boolean(item));
@@ -353,21 +375,44 @@ export function MarketHome() {
     queryKey: ["home-quotes", slugs],
     queryFn: () => getQuotes(slugs),
     enabled: canLoadMarket && slugs.length > 0,
-    refetchInterval: 20_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: "always",
+    refetchOnReconnect: "always",
   });
   const candles = useQuery({
     queryKey: ["home-candles", activeSlug, timeframe],
-    queryFn: () => getCandles(activeSlug, timeframe),
+    queryFn: async () => {
+      const response = await getCandles(activeSlug, timeframe);
+      if (response.timeframe !== timeframe) {
+        throw new Error("Candle timeframe mismatch");
+      }
+      return { ...response, items: normalizeCandles(response.items) };
+    },
     enabled: canLoadMarket && Boolean(activeSlug),
+    refetchOnWindowFocus: "always",
+    refetchOnReconnect: "always",
   });
 
   if (state === "idle" || state === "validating") return <DashboardSkeleton />;
   if (!canLoadMarket) {
-    return <BlockingState title="Откройте Pepe через Telegram" message="Рыночные данные доступны после безопасного запуска Mini App из чата с ботом." />;
+    return (
+      <BlockingState
+        title="Откройте Pepe через Telegram"
+        message="Рыночные данные доступны после безопасного запуска Mini App из чата с ботом."
+        diagnosticCode={state === "browser" ? "TG_INIT_UNAVAILABLE" : "AUTH_EXCHANGE_FAILED"}
+      />
+    );
   }
   if (catalog.isLoading) return <DashboardSkeleton />;
   if (catalog.isError) {
-    return <BlockingState title="Не удалось загрузить рынок" message="Проверьте подключение и повторите запрос." retry={() => void catalog.refetch()} />;
+    return (
+      <BlockingState
+        title="Не удалось загрузить рынок"
+        message="Проверьте подключение и повторите запрос."
+        diagnosticCode={marketDiagnosticCode(catalog.error)}
+        retry={() => void catalog.refetch()}
+      />
+    );
   }
   if (trackedAssets.length === 0) {
     return <BlockingState title="Инструменты пока недоступны" message="Каталог не содержит активных рыночных инструментов." retry={() => void catalog.refetch()} />;

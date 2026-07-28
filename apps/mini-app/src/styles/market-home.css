@@ -120,7 +120,18 @@ select:focus-visible {
 }
 
 .asset-identity { gap: 11px; }
-.asset-mark { display: inline-flex; flex: 0 0 auto; }
+.asset-mark {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(133, 163, 202, 0.14);
+  border-radius: 12px;
+  background: #111824;
+  padding: 5px;
+}
+.asset-mark-btc { padding: 4px; }
+.asset-icon-image { display: block; width: 100%; height: 100%; object-fit: contain; }
 .asset-identity div { display: flex; flex-direction: column; }
 .asset-identity span { color: var(--color-text-muted); font-size: 10px; font-weight: 650; letter-spacing: 0.06em; }
 .asset-identity strong { margin-top: 1px; font-size: 14px; font-weight: 700; }
@@ -284,13 +295,44 @@ select:focus-visible {
 .feed-row > svg { color: #4d5a6d; }
 .stale-text { color: var(--color-warning) !important; }
 
-.chart-card { position: relative; }
 .chart-heading { padding-right: 1px; }
-.instrument-select { position: absolute; top: 54px; left: 15px; z-index: 2; }
-.instrument-select select { height: 28px; appearance: none; border: 1px solid rgba(57, 139, 255, 0.24); border-radius: 999px; background: #121a26; padding: 0 23px 0 10px; color: #bcd8ff; font-size: 9px; font-weight: 750; }
-.instrument-select::after { position: absolute; top: 9px; right: 9px; width: 5px; height: 5px; border-right: 1px solid #86baff; border-bottom: 1px solid #86baff; content: ""; pointer-events: none; transform: rotate(45deg); }
-.timeframe-tabs { display: flex; justify-content: flex-end; gap: 2px; margin-top: 11px; }
-.timeframe-tabs button { min-width: 30px; height: 28px; border-radius: 8px; color: var(--color-text-muted); font-size: 9px; font-weight: 700; transition: color 180ms ease, background-color 180ms ease, transform 180ms ease; }
+.chart-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.instrument-select {
+  position: relative;
+  display: grid;
+  max-width: 100%;
+  flex: 0 1 auto;
+  grid-template-columns: 28px minmax(0, auto);
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  height: 34px;
+  border: 1px solid rgba(57, 139, 255, 0.24);
+  border-radius: 10px;
+  background: #121a26;
+  padding: 2px 8px 2px 3px;
+}
+.instrument-select .asset-mark { width: 28px; height: 28px; border-radius: 8px; padding: 4px; }
+.instrument-select select {
+  min-width: 0;
+  max-width: 112px;
+  height: 28px;
+  appearance: none;
+  background: transparent;
+  padding: 0 18px 0 0;
+  color: #bcd8ff;
+  font-size: 9px;
+  font-weight: 750;
+}
+.instrument-select::after { position: absolute; top: 13px; right: 10px; width: 5px; height: 5px; border-right: 1px solid #86baff; border-bottom: 1px solid #86baff; content: ""; pointer-events: none; transform: rotate(45deg); }
+.timeframe-tabs { display: grid; min-width: 184px; flex: 1 1 184px; grid-template-columns: repeat(6, minmax(28px, 1fr)); gap: 2px; }
+.timeframe-tabs button { min-width: 0; height: 32px; border-radius: 8px; color: var(--color-text-muted); font-size: 9px; font-weight: 700; transition: color 180ms ease, background-color 180ms ease, transform 180ms ease; }
 .timeframe-tabs button.is-active { background: #1b4f8e; color: #e8f3ff; }
 .timeframe-tabs button:active { transform: scale(0.94); }
 .chart-stage { min-height: 152px; margin: 8px -3px 0; }
@@ -298,6 +340,7 @@ select:focus-visible {
 .market-chart-grid { stroke: rgba(255, 255, 255, 0.055); stroke-width: 1; }
 .market-chart-area { fill: rgba(57, 139, 255, 0.09); }
 .market-chart-line { fill: none; stroke: #56a0ff; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2.2; vector-effect: non-scaling-stroke; animation: chart-reveal 600ms ease both; }
+.market-chart-point { fill: #56a0ff; vector-effect: non-scaling-stroke; }
 .chart-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.06); }
 .chart-stats div { min-width: 0; }
 .chart-stats dt { overflow: hidden; color: var(--color-text-muted); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }

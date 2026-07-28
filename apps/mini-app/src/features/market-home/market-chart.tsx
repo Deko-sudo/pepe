@@ -1,36 +1,15 @@
 import { useMemo } from "react";
 
 import type { Candle } from "@/shared/api/market";
-import { decimalScale, decimalToScaled } from "@/shared/lib/decimal";
+
+import { buildChartGeometry, serializePoints } from "./chart-data";
 
 interface MarketChartProps {
   candles: Candle[];
 }
 
 export function MarketChart({ candles }: MarketChartProps) {
-  const geometry = useMemo(() => {
-    if (candles.length === 0) return null;
-    const scale = candles.reduce(
-      (maximum, candle) => Math.max(maximum, decimalScale(candle.close)),
-      0,
-    );
-    const values = candles.map((candle) => decimalToScaled(candle.close, scale));
-    const low = values.reduce((current, value) => value < current ? value : current);
-    const high = values.reduce((current, value) => value > current ? value : current);
-    const range = high - low || 1n;
-    const pointList = values.map((value, index) => {
-      const x = 10 + (index / Math.max(values.length - 1, 1)) * 300;
-      const y = 126 - Number(((value - low) * 10000n) / range) / 10000 * 102;
-      return `${x.toFixed(2)},${y.toFixed(2)}`;
-    });
-    const points = pointList.join(" ");
-    const firstPoint = pointList[0] ?? "10,126";
-    const lastPoint = pointList[pointList.length - 1] ?? "310,126";
-    return {
-      points,
-      fillPoints: `${firstPoint.split(",")[0]},136 ${points} ${lastPoint.split(",")[0]},136`,
-    };
-  }, [candles]);
+  const geometry = useMemo(() => buildChartGeometry(candles), [candles]);
 
   if (!geometry) {
     return (
@@ -47,15 +26,31 @@ export function MarketChart({ candles }: MarketChartProps) {
     <svg
       viewBox="0 0 320 140"
       role="img"
-      aria-label={`График из ${candles.length} закрытых свечей`}
+      aria-label={`График из ${geometry.candles.length} закрытых свечей`}
       className="market-chart"
       preserveAspectRatio="none"
     >
       {[28, 62, 96, 130].map((y) => (
         <line key={y} x1="8" x2="312" y1={y} y2={y} className="market-chart-grid" />
       ))}
-      <polygon points={geometry.fillPoints} className="market-chart-area" />
-      <polyline points={geometry.points} className="market-chart-line" />
+      {geometry.segments.map((segment, index) => {
+        const points = serializePoints(segment.points);
+        const first = segment.points[0];
+        const last = segment.points[segment.points.length - 1];
+        if (!first || !last) return null;
+        if (segment.points.length === 1) {
+          return <circle key={`point-${index}`} cx={first.x} cy={first.y} r="2.5" className="market-chart-point" />;
+        }
+        return (
+          <g key={`segment-${index}`}>
+            <polygon
+              points={`${first.x.toFixed(3)},130 ${points} ${last.x.toFixed(3)},130`}
+              className="market-chart-area"
+            />
+            <polyline points={points} className="market-chart-line" />
+          </g>
+        );
+      })}
     </svg>
   );
 }

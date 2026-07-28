@@ -2,6 +2,7 @@ import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
+import { clearSessionToken } from "../src/shared/api";
 import { TelegramProvider } from "../src/shared/telegram/provider";
 import { useTelegramAuth } from "../src/shared/telegram/context";
 
@@ -49,6 +50,7 @@ const profile = {
 };
 
 afterEach(() => {
+  clearSessionToken();
   cleanup();
   delete (window as Record<string, unknown>).Telegram;
   vi.restoreAllMocks();
@@ -76,6 +78,12 @@ describe("session bootstrap", () => {
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(profile), {
+          status: 200,
+          headers: { "X-Pepe-Session-Token": "desktop-session-token" },
+        }),
+      )
       .mockResolvedValueOnce(new Response(JSON.stringify(profile), { status: 200 }));
 
     renderProvider();
@@ -86,6 +94,32 @@ describe("session bootstrap", () => {
       2,
       "/api/v1/auth/telegram/session",
       expect.objectContaining({ credentials: "include" }),
+    );
+  });
+
+  it("activates a header session when Telegram Desktop rejects the cookie", async () => {
+    installMockWebApp("signed-init-data");
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(profile), {
+          status: 200,
+          headers: { "X-Pepe-Session-Token": "desktop-session-token" },
+        }),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(profile), { status: 200 }));
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("valid:Test"));
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      4,
+      "/api/v1/users/me",
+      expect.objectContaining({
+        headers: { Authorization: "Bearer desktop-session-token" },
+      }),
     );
   });
 
@@ -162,6 +196,12 @@ describe("session bootstrap", () => {
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(profile), {
+          status: 200,
+          headers: { "X-Pepe-Session-Token": "desktop-session-token" },
+        }),
+      )
       .mockResolvedValueOnce(new Response(JSON.stringify(profile), { status: 200 }));
 
     render(
@@ -173,6 +213,6 @@ describe("session bootstrap", () => {
     );
 
     await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("valid:Test"));
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
   });
 });

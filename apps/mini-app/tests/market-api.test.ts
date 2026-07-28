@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { activateSessionToken, clearSessionToken } from "../src/shared/api";
 import { CandleSchema, getQuotes, QuoteSchema } from "../src/shared/api/market";
 
 const quote = {
@@ -30,6 +31,7 @@ const quote = {
 };
 
 afterEach(() => {
+  clearSessionToken();
   vi.restoreAllMocks();
 });
 
@@ -75,6 +77,25 @@ describe("market API client", () => {
     expect(fetchSpy).toHaveBeenCalledWith(
       "/api/v1/assets/quotes?slug=btc-usdt&slug=eth-usdt&slug=xau-usd",
       { credentials: "include" },
+    );
+  });
+
+  it("adds the in-memory header session to market requests", async () => {
+    activateSessionToken("desktop-session-token");
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ items: [quote], unavailable: [], not_found: [] }), {
+        status: 200,
+      }),
+    );
+
+    await getQuotes(["btc-usdt"]);
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/api/v1/assets/quotes?slug=btc-usdt",
+      {
+        credentials: "include",
+        headers: { Authorization: expect.stringContaining("desktop-session-token") },
+      },
     );
   });
 });
