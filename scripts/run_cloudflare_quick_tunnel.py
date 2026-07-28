@@ -69,10 +69,14 @@ def apply_tunnel_env(repo_root: Path, environment: dict[str, str]) -> None:
     the tunnel cleanly reverts to safe localhost defaults. Only the
     tunnel-controlled keys are touched; all other values (including
     ``TELEGRAM_BOT_TOKEN``) are preserved verbatim.
+
+    An existing backup is never overwritten, so a second tunnel start (or a
+    prior process that died before cleanup) cannot replace the developer's
+    original ``.env`` with an already-tunnel-modified snapshot.
     """
     env_path = repo_root / ENV_FILE
     backup_path = repo_root / ENV_BACKUP
-    if env_path.exists():
+    if env_path.exists() and not backup_path.exists():
         backup_path.write_bytes(env_path.read_bytes())
     values = _parse_env_file(env_path)
     for key in TUNNEL_ENV_KEYS:

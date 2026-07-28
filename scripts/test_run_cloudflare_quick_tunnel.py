@@ -130,3 +130,30 @@ def test_apply_then_plain_compose_resolves_public_origin(tmp_path: Path) -> None
     # the resolved value must contain the public origin (no localhost fallback).
     assert public_url in merged["SESSION_ALLOWED_ORIGINS"]
     assert merged["SESSION_ALLOWED_ORIGINS"].count("https://") == 1
+
+
+def test_second_apply_does_not_overwrite_original_backup(tmp_path: Path) -> None:
+    """A second tunnel start (or an orphaned prior process) must not replace the
+    original ``.env`` backup with an already-tunnel-modified snapshot, otherwise
+    restore_env would reinstate tunnel origins instead of the developer's values."""
+    tunnel = _load_tunnel_module()
+    original = (
+        "TELEGRAM_BOT_TOKEN=secret-value\n"
+        "MINI_APP_URL=http://localhost\n"
+        "SESSION_ALLOWED_ORIGINS=http://localhost:4000\n"
+    )
+    (tmp_path / ".env").write_text(original, encoding="utf-8")
+
+    first_url = "https://first.trycloudflare.com"
+    second_url = "https://second.trycloudflare.com"
+    tunnel.apply_tunnel_env(tmp_path, _tunnel_env(first_url))
+    tunnel.apply_tunnel_env(tmp_path, _tunnel_env(second_url))
+
+    # The backup must still hold the developer's original .env.
+    backup = tmp_path / ".env.tunnel-backup"
+    assert backup.read_text(encoding="utf-8") == original
+
+    # And restoring must return the original values, not the first tunnel's.
+    tunnel.restore_env(tmp_path)
+    restored = (tmp_path / ".env").read_text(encoding="utf-8")
+    assert restored == original
