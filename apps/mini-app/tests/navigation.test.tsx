@@ -16,5 +16,6 @@ describe("BottomNav", () => {
     expect(screen.getByText("Сводки")).toBeInTheDocument();
     expect(screen.getByText("Настройки")).toBeInTheDocument();
     expect(screen.getAllByRole("link")).toHaveLength(5);
+    expect(screen.getByRole("link", { name: "Сессия" })).toHaveAttribute("href", "/#session-card");
   });
 });

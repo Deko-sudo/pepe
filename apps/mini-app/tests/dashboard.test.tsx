@@ -60,13 +60,14 @@ const candles = [
 
 function renderDashboard() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const view = render(
     <QueryClientProvider client={client}>
       <MemoryRouter>
         <Dashboard />
       </MemoryRouter>
     </QueryClientProvider>,
   );
+  return { ...view, client };
 }
 
 beforeEach(() => {
@@ -132,6 +133,35 @@ describe("Stage 8 home dashboard", () => {
     await waitFor(() => expect(api.getCandles).toHaveBeenLastCalledWith("eth-usdt", "5m"));
   });
 
+  it("moves candle requests back to an available instrument after a catalog refresh", async () => {
+    const { client } = renderDashboard();
+    await screen.findAllByText("119 000");
+
+    fireEvent.click(screen.getByRole("button", { name: "Выбрать Ethereum" }));
+    await waitFor(() => expect(api.getCandles).toHaveBeenLastCalledWith("eth-usdt", "1h"));
+
+    api.getAssets.mockResolvedValueOnce({ items: [assets[0], assets[2]], next_cursor: null });
+    await client.refetchQueries({ queryKey: ["home-assets"] });
+
+    await waitFor(() => expect(api.getCandles).toHaveBeenLastCalledWith("btc-usdt", "1h"));
+    expect(screen.getAllByText("BTC/USDT").length).toBeGreaterThan(0);
+  });
+
+  it("uses one candle period when only half of the 24-hour range is available", async () => {
+    api.getQuotes.mockResolvedValue({
+      items: [{ ...quoteFor("btc-usdt", "119000.00"), high_24h: "125000.00", low_24h: null }],
+      unavailable: [],
+      not_found: [],
+    });
+    renderDashboard();
+
+    expect(await screen.findByText("Макс. · 1h")).toBeInTheDocument();
+    expect(screen.getByText("Мин. · 1h")).toBeInTheDocument();
+    expect(screen.queryByText("125 000")).not.toBeInTheDocument();
+    expect(screen.getAllByText("120 000").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("115 500").length).toBeGreaterThan(0);
+  });
+
   it("shows session, AI presentation, and no prohibited analytics", async () => {
     renderDashboard();
     await screen.findAllByText("119 000");
@@ -164,6 +194,7 @@ describe("Stage 8 home dashboard", () => {
 
     expect(await screen.findByText("Котировка временно недоступна")).toBeInTheDocument();
     expect(await screen.findByText("История свечей пока недоступна")).toBeInTheDocument();
+    expect(screen.getByLabelText("Данные недоступны")).toBeInTheDocument();
 
     api.getQuotes.mockResolvedValue({
       items: [quoteFor("btc-usdt", "119000.00", "stale")],
@@ -172,5 +203,14 @@ describe("Stage 8 home dashboard", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Повторить загрузку" }));
     await waitFor(() => expect(api.getQuotes).toHaveBeenCalledTimes(2));
+  });
+
+  it("distinguishes a quote request failure from a missing instrument", async () => {
+    api.getQuotes.mockRejectedValueOnce(new Error("network unavailable"));
+    renderDashboard();
+
+    expect(await screen.findByText("Не удалось загрузить котировку")).toBeInTheDocument();
+    expect(screen.queryByText("Котировка не найдена")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Данные недоступны")).toBeInTheDocument();
   });
 });

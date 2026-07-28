@@ -1,4 +1,4 @@
-import { Link, NavLink } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import { Activity, BarChart3, FileText, Home, Settings } from "lucide-react";
 
 const navItems = [
@@ -14,10 +14,10 @@ export function BottomNav() {
     <nav className="bottom-nav-shell safe-area-bottom" aria-label="Основная навигация">
       <div className="bottom-nav-inner">
         {navItems.map((item, index) => item.anchor ? (
-          <Link key={item.to} to={item.to} className="bottom-nav-item bottom-nav-primary">
+          <a key={item.to} href={item.to} className="bottom-nav-item bottom-nav-primary">
             <span className="bottom-nav-icon"><item.icon size={19} strokeWidth={1.7} /></span>
             <span>{item.label}</span>
-          </Link>
+          </a>
         ) : (
           <NavLink
             key={item.to}

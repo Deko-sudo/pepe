@@ -125,13 +125,15 @@ interface HeroCardProps {
   timeframe: Timeframe;
   loading: boolean;
   unavailable: boolean;
+  error: boolean;
   onRetry: () => void;
 }
 
-function HeroCard({ asset, quote, stats, timeframe, loading, unavailable, onRetry }: HeroCardProps) {
-  const high = quote?.high_24h ?? stats?.high;
-  const low = quote?.low_24h ?? stats?.low;
-  const rangeLabel = quote?.high_24h && quote.low_24h ? "24 ч" : timeframe;
+function HeroCard({ asset, quote, stats, timeframe, loading, unavailable, error, onRetry }: HeroCardProps) {
+  const hasQuoteRange = quote?.high_24h != null && quote.low_24h != null;
+  const high = hasQuoteRange ? quote.high_24h : stats?.high;
+  const low = hasQuoteRange ? quote.low_24h : stats?.low;
+  const rangeLabel = hasQuoteRange ? "24 ч" : timeframe;
   return (
     <section className="market-hero enter-card" aria-live="polite">
       <div className="hero-geometry" aria-hidden="true"><i /><i /><i /></div>
@@ -154,7 +156,7 @@ function HeroCard({ asset, quote, stats, timeframe, loading, unavailable, onRetr
           <strong className="hero-price number-change">{formatDecimal(quote.price, asset.price_precision)}</strong>
         ) : (
           <div className="quote-unavailable">
-            <strong>{unavailable ? "Котировка временно недоступна" : "Котировка не найдена"}</strong>
+            <strong>{error ? "Не удалось загрузить котировку" : unavailable ? "Котировка временно недоступна" : "Котировка не найдена"}</strong>
             <button type="button" onClick={onRetry} aria-label="Повторить загрузку"><RefreshCw size={14} /></button>
           </div>
         )}
@@ -182,6 +184,8 @@ function HeroCard({ asset, quote, stats, timeframe, loading, unavailable, onRetr
 }
 
 function DataContext({ quote }: { quote?: Quote }) {
+  const statusClass = quote?.data_status === "stale" ? "is-stale" : quote ? "is-fresh" : "is-unavailable";
+  const statusLabel = quote?.data_status === "stale" ? "Данные устарели" : quote ? "Данные актуальны" : "Данные недоступны";
   return (
     <section className="context-card enter-card" aria-labelledby="market-context-title">
       <span className="context-icon" aria-hidden="true">
@@ -192,7 +196,7 @@ function DataContext({ quote }: { quote?: Quote }) {
         <strong>{quote ? marketStatusText(quote.market_status) : "Ожидание котировки"}</strong>
         <p>{quote ? `Последнее наблюдение: ${freshnessText(quote)}.` : "Провайдер пока не вернул котировку."}</p>
         {quote ? <small className="context-meta">{quote.provenance.price_type} · {quote.provenance.delay_class}</small> : null}
-        <div className={`freshness-track ${quote?.data_status === "stale" ? "is-stale" : "is-fresh"}`} aria-label={quote?.data_status === "stale" ? "Данные устарели" : "Данные актуальны"}><i /></div>
+        <div className={`freshness-track ${statusClass}`} aria-label={statusLabel}><i /></div>
       </div>
     </section>
   );
@@ -326,12 +330,14 @@ export function MarketHome() {
     const preferred = TRACKED_SLUGS.map((slug) => items.find((item) => item.slug === slug)).filter((item): item is Asset => Boolean(item));
     return preferred.length ? preferred : items.slice(0, 3);
   }, [catalog.data]);
+  const selectedAsset = trackedAssets.find((asset) => asset.slug === selectedSlug) ?? trackedAssets[0];
+  const activeSlug = selectedAsset?.slug ?? "";
 
   useEffect(() => {
-    if (!selectedSlug && trackedAssets.length) {
-      setSelectedSlug(trackedAssets.find((asset) => asset.slug === "btc-usdt")?.slug ?? trackedAssets[0]?.slug ?? "");
+    if (activeSlug && activeSlug !== selectedSlug) {
+      setSelectedSlug(activeSlug);
     }
-  }, [selectedSlug, trackedAssets]);
+  }, [activeSlug, selectedSlug]);
 
   useEffect(() => {
     const targetId = window.location.hash.slice(1);
@@ -348,9 +354,9 @@ export function MarketHome() {
     refetchInterval: 20_000,
   });
   const candles = useQuery({
-    queryKey: ["home-candles", selectedSlug, timeframe],
-    queryFn: () => getCandles(selectedSlug, timeframe),
-    enabled: canLoadMarket && Boolean(selectedSlug),
+    queryKey: ["home-candles", activeSlug, timeframe],
+    queryFn: () => getCandles(activeSlug, timeframe),
+    enabled: canLoadMarket && Boolean(activeSlug),
   });
 
   if (state === "idle" || state === "validating") return <DashboardSkeleton />;
@@ -365,7 +371,7 @@ export function MarketHome() {
     return <BlockingState title="Инструменты пока недоступны" message="Каталог не содержит активных рыночных инструментов." retry={() => void catalog.refetch()} />;
   }
 
-  const selected = trackedAssets.find((asset) => asset.slug === selectedSlug) ?? trackedAssets[0];
+  const selected = selectedAsset;
   if (!selected) {
     return <BlockingState title="Инструменты пока недоступны" message="Каталог не содержит активных рыночных инструментов." retry={() => void catalog.refetch()} />;
   }
@@ -379,7 +385,7 @@ export function MarketHome() {
         <div><span className="section-kicker">Market intelligence</span><h1>Pepe</h1></div>
         <span className="home-status"><i />Secure</span>
       </header>
-      <HeroCard asset={selected} quote={selectedQuote} stats={stats} timeframe={timeframe} loading={quotes.isLoading} unavailable={quoteUnavailable} onRetry={() => void quotes.refetch()} />
+      <HeroCard asset={selected} quote={selectedQuote} stats={stats} timeframe={timeframe} loading={quotes.isLoading} unavailable={quoteUnavailable} error={quotes.isError} onRetry={() => void quotes.refetch()} />
       <QuickActions />
       <DataContext quote={selectedQuote} />
       {quotes.isError ? (

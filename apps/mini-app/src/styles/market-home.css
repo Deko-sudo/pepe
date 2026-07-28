@@ -250,6 +250,7 @@ select:focus-visible {
 .freshness-track { height: 3px; margin-top: 9px; overflow: hidden; border-radius: 999px; background: #1a2230; }
 .freshness-track i { display: block; width: 100%; height: 100%; border-radius: inherit; background: var(--color-positive); transition: background-color 220ms ease; }
 .freshness-track.is-stale i { background: var(--color-warning); }
+.freshness-track.is-unavailable i { background: var(--color-text-muted); }
 
 .section-heading { justify-content: space-between; gap: 12px; }
 .section-heading h2 { margin-top: 1px; font-size: 17px; font-weight: 720; letter-spacing: -0.025em; }
