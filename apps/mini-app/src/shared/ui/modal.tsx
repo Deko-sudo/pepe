@@ -53,8 +53,6 @@ export function Modal({ isOpen, onClose, title, children, returnFocusRef }: Moda
     return () => window.cancelAnimationFrame(frame);
   }, [isOpen]);
 
-  useEffect(() => () => restorePreviousFocus(), [restorePreviousFocus]);
-
   if (!isOpen) return null;
 
   return (
