@@ -1,6 +1,6 @@
 # Stage 7 — Candles and historical data
 
-**Status:** implementation in progress. This document records the currently implemented historical-candle contract and the Compose/CI operational boundary; it does not claim a concrete market-data provider or indicator implementation.
+**Status:** completed and merged. This document records the implemented historical-candle contract and the Compose/CI operational boundary; it does not claim a concrete market-data provider or indicator implementation.
 
 ## Package and persistence boundary
 
@@ -55,7 +55,7 @@ The Compose worker consumes `celery,quotes,candles`; the scheduler is a separate
 
 Each candle sync target `(instrument UUID, timeframe)` takes a Redis `SET NX EX` lease at `pepe:candles:sync-lease:v1:<instrument-uuid>:<timeframe>`. Its default TTL is 300 seconds (`CANDLE_SYNC_LEASE_TTL_SECONDS`). The token is randomly owned and release uses compare-and-delete, so a worker cannot delete a lease it no longer owns. A held lease is a normal skipped sync; Redis lease unavailability is retryable. Provider, validation, and persistence failures are retryable and the Celery task uses exponential backoff with jitter. Leases are not renewed.
 
-The deterministic fake source is enabled only when `QUOTE_FAKE_PROVIDER_ENABLED=true`; it is a development/Compose path, not a provider selection or production market-data claim.
+The deterministic fake candle source is enabled only when `CANDLE_FAKE_PROVIDER_ENABLED=true`; it is independently controlled from `QUOTE_FAKE_PROVIDER_ENABLED` and remains a development/Compose path, not a provider selection or production market-data claim.
 
 ## CI and integration boundary
 

@@ -1,6 +1,6 @@
 # Stage 5 — Asset Catalog and Market Provider Abstraction
 
-**Status:** APPROVED / IN PROGRESS
+**Status:** COMPLETED AND MERGED
 
 ## Scope and exclusions
 

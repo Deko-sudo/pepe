@@ -1,6 +1,6 @@
 # Stage 6 PR 1 — Provider-neutral Current Quotes Foundation
 
-**Status:** IMPLEMENTATION IN PROGRESS — provider-neutral PR only.
+**Status:** COMPLETED AND MERGED — provider-neutral foundation.
 
 ## Approved boundary
 
