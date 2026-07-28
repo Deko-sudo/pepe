@@ -59,4 +59,4 @@ API liveness remains `/api/v1/health`; readiness checks PostgreSQL and Redis. Pr
 
 No concrete provider, HTTP adapter, market-data network call, credential, production mapping, vendor attribution, WebSocket ingestion, candles, history, analytics, notification, real market UI or Stage 7 work is included.
 
-Roadmap state: Stage 5 is complete and merged. Stage 6 is in progress in this provider-neutral PR and is not complete. Official completion remains `5/12 = 41.7%`.
+Roadmap state: Stages 1–8 are complete and merged. Official completion is `8/12 = 67%`.

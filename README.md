@@ -33,12 +33,15 @@ Telegram Mini App для рыночной аналитики криптовал�
 
 Официальные records: Stages 1–8 completed and merged. Contracts for [Stage 4](docs/architecture/stage-4-sessions-api-authorization.md), [Stage 5](docs/architecture/stage-5-asset-catalog-provider-abstraction.md), [Stage 6](docs/architecture/stage-6-provider-neutral-current-quotes-foundation.md), and [Stage 7](docs/architecture/stage-7-candles-historical-data.md) remain the architectural source of truth.
 
-## Контекст будущих этапов (не реализовано)
+## Реализованные этапы 5–8
 
 - **Stage 5:** asset catalog and provider abstraction реализованы для BTC/USDT, ETH/USDT и XAU/USD.
 - **Stage 6:** provider-neutral current quotes, cache, timestamps and stale handling реализованы.
 - **Stage 7:** OHLCV и historical candles реализованы. Текущий контракт и operational semantics описаны в [Stage 7 architecture](docs/architecture/stage-7-candles-historical-data.md); indicator warm-up остаётся дальнейшим потребителем данных.
-- **Stage 8:** real market UI merged в PR #9 с реальными данными и состояниями loading, unavailable, not-found и error.
+- **Stage 8:** real market UI merged в PR #9 с данными из защищённого API и состояниями loading, unavailable, not-found и error. Compose использует явно включаемые детерминированные fake providers; интеграция с внешним live-провайдером пока не реализована.
+
+## Контекст будущих этапов 9–12 (не реализовано)
+
 - **Stage 9:** Swing High / Swing Low, EMA, ATR, RSI, volume, FVG, sessions, BTC context, Trend Score и матрица триады. До реализации требуется формализовать Trend Score/веса/пороги, матрицу триады, FVG formulas/mitigation, session timezone/DST; BTC context применим только к crypto, а XAU/USD, indices и yields требуют отдельной логики.
 - **Stage 10:** reports, publishing, history и безопасный аналитический язык.
 - **Stage 11:** AI explanation, notifications, preferences, rate limits и отсутствие финансовых обещаний.
