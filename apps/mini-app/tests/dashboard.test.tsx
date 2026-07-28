@@ -141,6 +141,7 @@ describe("Stage 8 home dashboard", () => {
 
   it("scrolls the session card when the route hash changes after mount", async () => {
     const scrollIntoView = vi.fn();
+    const originalDescriptor = Object.getOwnPropertyDescriptor(Element.prototype, "scrollIntoView");
     Object.defineProperty(Element.prototype, "scrollIntoView", {
       configurable: true,
       value: scrollIntoView,
@@ -154,7 +155,11 @@ describe("Stage 8 home dashboard", () => {
 
       await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: "center" }));
     } finally {
-      delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+      if (originalDescriptor) {
+        Object.defineProperty(Element.prototype, "scrollIntoView", originalDescriptor);
+      } else {
+        delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+      }
     }
   });
 
