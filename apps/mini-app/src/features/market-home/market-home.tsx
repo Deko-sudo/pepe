@@ -34,6 +34,7 @@ import { Modal } from "@/shared/ui/modal";
 
 import { AssetIcon } from "./asset-icon";
 import { normalizeCandles } from "./chart-data";
+import { quoteFreshness } from "./freshness";
 import { MarketChart } from "./market-chart";
 
 const TRACKED_SLUGS = ["btc-usdt", "eth-usdt", "xau-usd"];
@@ -42,13 +43,6 @@ function provenanceMode(sourceLabel?: string | null) {
   return sourceLabel && /^(synthetic|fake|fixture|demo|test)(?:\b|[-_ ])/i.test(sourceLabel)
     ? "DEMO"
     : "LIVE";
-}
-
-function freshnessText(quote: Quote) {
-  if (quote.data_status === "stale") return "данные устарели";
-  if (quote.age_seconds < 5) return "только что";
-  if (quote.age_seconds < 60) return `${Math.floor(quote.age_seconds)} сек назад`;
-  return `${Math.floor(quote.age_seconds / 60)} мин назад`;
 }
 
 function marketStatusText(status: string) {
@@ -134,6 +128,7 @@ function QuickActions() {
 interface HeroCardProps {
   asset: Asset;
   quote?: Quote;
+  freshnessElapsedSeconds: number;
   stats: ReturnType<typeof candleStatistics>;
   timeframe: Timeframe;
   loading: boolean;
@@ -142,11 +137,12 @@ interface HeroCardProps {
   onRetry: () => void;
 }
 
-function HeroCard({ asset, quote, stats, timeframe, loading, unavailable, error, onRetry }: HeroCardProps) {
+function HeroCard({ asset, quote, freshnessElapsedSeconds, stats, timeframe, loading, unavailable, error, onRetry }: HeroCardProps) {
   const hasQuoteRange = quote?.high_24h != null && quote.low_24h != null;
   const high = hasQuoteRange ? quote.high_24h : stats?.high;
   const low = hasQuoteRange ? quote.low_24h : stats?.low;
   const rangeLabel = hasQuoteRange ? "24 ч" : timeframe;
+  const freshness = quote ? quoteFreshness(quote, freshnessElapsedSeconds) : null;
   return (
     <section className="market-hero enter-card">
       <div className="hero-geometry" aria-hidden="true"><i /><i /><i /></div>
@@ -175,8 +171,8 @@ function HeroCard({ asset, quote, stats, timeframe, loading, unavailable, error,
         )}
         {quote ? (
           <span className="hero-freshness">
-            <i className={quote.data_status === "stale" ? "is-stale" : ""} aria-hidden="true" />
-            {freshnessText(quote)}
+            <i className={freshness?.stale ? "is-stale" : ""} aria-hidden="true" />
+            {freshness?.text}
           </span>
         ) : null}
         {quote?.change_percent_24h ? (
@@ -196,9 +192,10 @@ function HeroCard({ asset, quote, stats, timeframe, loading, unavailable, error,
   );
 }
 
-function DataContext({ quote }: { quote?: Quote }) {
-  const statusClass = quote?.data_status === "stale" ? "is-stale" : quote ? "is-fresh" : "is-unavailable";
-  const statusLabel = quote?.data_status === "stale" ? "Данные устарели" : quote ? "Данные актуальны" : "Данные недоступны";
+function DataContext({ quote, freshnessElapsedSeconds }: { quote?: Quote; freshnessElapsedSeconds: number }) {
+  const freshness = quote ? quoteFreshness(quote, freshnessElapsedSeconds) : null;
+  const statusClass = freshness?.stale ? "is-stale" : quote ? "is-fresh" : "is-unavailable";
+  const statusLabel = freshness?.stale ? "Данные устарели" : quote ? "Данные актуальны" : "Данные недоступны";
   return (
     <section className="context-card enter-card" aria-labelledby="market-context-title">
       <span className="context-icon" data-icon="market-status-activity" aria-hidden="true">
@@ -207,7 +204,7 @@ function DataContext({ quote }: { quote?: Quote }) {
       <div className="context-copy">
         <span className="eyebrow" id="market-context-title">Состояние данных</span>
         <strong>{quote ? marketStatusText(quote.market_status) : "Ожидание котировки"}</strong>
-        <p>{quote ? `Последнее наблюдение: ${freshnessText(quote)}.` : "Провайдер пока не вернул котировку."}</p>
+        <p>{quote ? `Последнее наблюдение: ${freshness?.text}.` : "Провайдер пока не вернул котировку."}</p>
         {quote ? <small className="context-meta">{quote.provenance.price_type} · {quote.provenance.delay_class}</small> : null}
         <div className={`freshness-track ${statusClass}`} aria-label={statusLabel}><i /></div>
       </div>
@@ -218,13 +215,14 @@ function DataContext({ quote }: { quote?: Quote }) {
 interface MarketFeedProps {
   assets: Asset[];
   quotes: Quote[];
+  freshnessElapsedSeconds: number;
   unavailable: string[];
   notFound: string[];
   selectedSlug: string;
   onSelect: (slug: string) => void;
 }
 
-function MarketFeed({ assets, quotes, unavailable, notFound, selectedSlug, onSelect }: MarketFeedProps) {
+function MarketFeed({ assets, quotes, freshnessElapsedSeconds, unavailable, notFound, selectedSlug, onSelect }: MarketFeedProps) {
   const quoteMap = new Map(quotes.map((quote) => [quote.slug, quote]));
   const feedMode = quotes.length > 0 && quotes.every((quote) => provenanceMode(quote.provenance.source_label) === "LIVE") ? "LIVE" : "DEMO";
   return (
@@ -236,6 +234,7 @@ function MarketFeed({ assets, quotes, unavailable, notFound, selectedSlug, onSel
       <div className="feed-list">
         {assets.map((asset) => {
           const quote = quoteMap.get(asset.slug);
+          const freshness = quote ? quoteFreshness(quote, freshnessElapsedSeconds) : null;
           const isUnavailable = unavailable.includes(asset.slug);
           const isNotFound = notFound.includes(asset.slug);
           return (
@@ -251,7 +250,7 @@ function MarketFeed({ assets, quotes, unavailable, notFound, selectedSlug, onSel
               <span className="feed-name"><strong>{asset.symbol}</strong><small>{quote?.provenance.source_label ?? displayMarketType(asset)}</small></span>
               <span className="feed-value">
                 <strong>{quote ? formatDecimal(quote.price, asset.price_precision) : isUnavailable ? "Недоступно" : isNotFound ? "Не найдено" : "—"}</strong>
-                <small className={quote?.data_status === "stale" ? "stale-text" : ""}>{quote ? freshnessText(quote) : displayMarketType(asset)}</small>
+                <small className={freshness?.stale ? "stale-text" : ""}>{freshness?.text ?? displayMarketType(asset)}</small>
               </span>
               <ChevronRight size={15} aria-hidden="true" />
             </button>
@@ -342,6 +341,7 @@ export function MarketHome() {
   const canLoadMarket = state === "valid";
   const [selectedSlug, setSelectedSlug] = useState("");
   const [timeframe, setTimeframe] = useState<Timeframe>("1h");
+  const [freshnessClock, setFreshnessClock] = useState(() => Date.now());
   const catalog = useQuery({
     queryKey: ["home-assets"],
     queryFn: getAssets,
@@ -379,6 +379,14 @@ export function MarketHome() {
     refetchOnWindowFocus: "always",
     refetchOnReconnect: "always",
   });
+  useEffect(() => {
+    if (!quotes.dataUpdatedAt) return;
+    const interval = window.setInterval(() => setFreshnessClock(Date.now()), 1_000);
+    return () => window.clearInterval(interval);
+  }, [quotes.dataUpdatedAt]);
+  const freshnessElapsedSeconds = quotes.dataUpdatedAt
+    ? Math.max(0, (freshnessClock - quotes.dataUpdatedAt) / 1_000)
+    : 0;
   const candles = useQuery({
     queryKey: ["home-candles", activeSlug, timeframe],
     queryFn: async () => {
@@ -423,6 +431,9 @@ export function MarketHome() {
     return <BlockingState title="Инструменты пока недоступны" message="Каталог не содержит активных рыночных инструментов." retry={() => void catalog.refetch()} />;
   }
   const selectedQuote = quotes.data?.items.find((quote) => quote.slug === selected.slug);
+  const selectedFreshness = selectedQuote
+    ? quoteFreshness(selectedQuote, freshnessElapsedSeconds)
+    : null;
   const stats = candleStatistics(candles.data?.items ?? []);
   const quoteUnavailable = quotes.data?.unavailable.includes(selected.slug) ?? false;
 
@@ -432,16 +443,16 @@ export function MarketHome() {
         <div><span className="section-kicker">Market intelligence</span><h1>Pepe</h1></div>
         <span className="home-status"><i />Secure</span>
       </header>
-      <HeroCard asset={selected} quote={selectedQuote} stats={stats} timeframe={timeframe} loading={quotes.isLoading} unavailable={quoteUnavailable} error={quotes.isError} onRetry={() => void quotes.refetch()} />
+      <HeroCard asset={selected} quote={selectedQuote} freshnessElapsedSeconds={freshnessElapsedSeconds} stats={stats} timeframe={timeframe} loading={quotes.isLoading} unavailable={quoteUnavailable} error={quotes.isError} onRetry={() => void quotes.refetch()} />
       <QuickActions />
-      <DataContext quote={selectedQuote} />
+      <DataContext quote={selectedQuote} freshnessElapsedSeconds={freshnessElapsedSeconds} />
       {quotes.isError ? (
         <section className="inline-error" role="alert"><AlertTriangle size={17} /><span>Не удалось обновить котировки</span><button type="button" onClick={() => void quotes.refetch()}>Повторить загрузку</button></section>
       ) : null}
-      <MarketFeed assets={trackedAssets} quotes={quotes.data?.items ?? []} unavailable={quotes.data?.unavailable ?? []} notFound={quotes.data?.not_found ?? []} selectedSlug={selected.slug} onSelect={setSelectedSlug} />
+      <MarketFeed assets={trackedAssets} quotes={quotes.data?.items ?? []} freshnessElapsedSeconds={freshnessElapsedSeconds} unavailable={quotes.data?.unavailable ?? []} notFound={quotes.data?.not_found ?? []} selectedSlug={selected.slug} onSelect={setSelectedSlug} />
       <ChartCard assets={trackedAssets} selected={selected} selectedSlug={selected.slug} onSelect={setSelectedSlug} timeframe={timeframe} onTimeframe={setTimeframe} candles={candles.data} loading={candles.isLoading} error={candles.isError} retry={() => void candles.refetch()} />
       <InformationCards asset={selected} />
-      {selectedQuote?.data_status === "stale" ? <div className="stale-notice" role="status"><Activity size={15} />Данные устарели — показано последнее подтверждённое значение.</div> : null}
+      {selectedFreshness?.stale ? <div className="stale-notice" role="status"><Activity size={15} />Данные устарели — показано последнее подтверждённое значение.</div> : null}
     </main>
   );
 }
