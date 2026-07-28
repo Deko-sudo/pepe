@@ -25,7 +25,7 @@ Telegram Mini App для рыночной аналитики криптовал�
 5. Asset catalog and market provider abstraction — implementation in progress; not complete until merged.
 6. Current quotes — not started.
 7. Candles and historical data — implementation in progress.
-8. Real market UI — not started.
+8. Real market UI — implementation complete in [PR #9](https://github.com/Deko-sudo/pepe/pull/9); not complete until merged.
 9. Analytics core — not started.
 10. Reports and publishing — not started.
 11. AI Support and notifications — not started.
@@ -38,7 +38,7 @@ Telegram Mini App для рыночной аналитики криптовал�
 - **Stage 5:** asset catalog; BTC, ETH, XAU/USD; provider abstraction; разные правила ликвидности для crypto, metals, indices и yields.
 - **Stage 6:** current quotes; cache; timestamps; stale handling; provider failover.
 - **Stage 7:** OHLCV и historical candles. Текущий контракт и operational semantics описаны в [Stage 7 architecture](docs/architecture/stage-7-candles-historical-data.md); indicator warm-up остаётся дальнейшим потребителем данных.
-- **Stage 8:** real market UI с реальными данными и состояниями loading, unavailable, not-found и error.
+- **Stage 8:** real market UI реализован в PR #9 с реальными данными и состояниями loading, unavailable, not-found и error; официальный этап не завершён до merge.
 - **Stage 9:** Swing High / Swing Low, EMA, ATR, RSI, volume, FVG, sessions, BTC context, Trend Score и матрица триады. До реализации требуется формализовать Trend Score/веса/пороги, матрицу триады, FVG formulas/mitigation, session timezone/DST; BTC context применим только к crypto, а XAU/USD, indices и yields требуют отдельной логики.
 - **Stage 10:** reports, publishing, history и безопасный аналитический язык.
 - **Stage 11:** AI explanation, notifications, preferences, rate limits и отсутствие финансовых обещаний.
