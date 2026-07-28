@@ -12,9 +12,9 @@ Telegram Mini App для рыночной аналитики криптовал�
 
 **Этап 4 — Sessions and API authorization** — completed and merged in [PR #5](https://github.com/Deko-sudo/pepe/pull/5).
 
-**Этап 5 — Asset catalog and market provider abstraction** — implementation in progress.
+**Этапы 5–8** — completed and merged. Stage 8 Real Market UI was merged in [PR #9](https://github.com/Deko-sudo/pepe/pull/9).
 
-**Прогресс:** completed and merged 4/12, remaining 8/12, progress by stages 33%.
+**Прогресс:** completed and merged 8/12, remaining 4/12, progress by stages 67%.
 
 ## Дорожная карта
 
@@ -22,23 +22,26 @@ Telegram Mini App для рыночной аналитики криптовал�
 2. Telegram Mini App `initData` validation — completed and merged.
 3. Telegram users persistence — completed and merged.
 4. Sessions and API authorization — completed and merged in [PR #5](https://github.com/Deko-sudo/pepe/pull/5).
-5. Asset catalog and market provider abstraction — implementation in progress; not complete until merged.
-6. Current quotes — not started.
-7. Candles and historical data — implementation in progress.
-8. Real market UI — implementation complete in [PR #9](https://github.com/Deko-sudo/pepe/pull/9); not complete until merged.
+5. Asset catalog and market provider abstraction — completed and merged.
+6. Current quotes — completed and merged.
+7. Candles and historical data — completed and merged.
+8. Real market UI — completed and merged in [PR #9](https://github.com/Deko-sudo/pepe/pull/9).
 9. Analytics core — not started.
 10. Reports and publishing — not started.
 11. AI Support and notifications — not started.
 12. Production hardening and launch — not started.
 
-Официальные records: [Stage 4](docs/architecture/stage-4-sessions-api-authorization.md) completed and merged; [Stage 5](docs/architecture/stage-5-asset-catalog-provider-abstraction.md) approved and in progress. Official completion remains 4/12 until Stage 5 is merged.
+Официальные records: Stages 1–8 completed and merged. Contracts for [Stage 4](docs/architecture/stage-4-sessions-api-authorization.md), [Stage 5](docs/architecture/stage-5-asset-catalog-provider-abstraction.md), [Stage 6](docs/architecture/stage-6-provider-neutral-current-quotes-foundation.md), and [Stage 7](docs/architecture/stage-7-candles-historical-data.md) remain the architectural source of truth.
 
-## Контекст будущих этапов (не реализовано)
+## Реализованные этапы 5–8
 
-- **Stage 5:** asset catalog; BTC, ETH, XAU/USD; provider abstraction; разные правила ликвидности для crypto, metals, indices и yields.
-- **Stage 6:** current quotes; cache; timestamps; stale handling; provider failover.
-- **Stage 7:** OHLCV и historical candles. Текущий контракт и operational semantics описаны в [Stage 7 architecture](docs/architecture/stage-7-candles-historical-data.md); indicator warm-up остаётся дальнейшим потребителем данных.
-- **Stage 8:** real market UI реализован в PR #9 с реальными данными и состояниями loading, unavailable, not-found и error; официальный этап не завершён до merge.
+- **Stage 5:** asset catalog and provider abstraction реализованы для BTC/USDT, ETH/USDT и XAU/USD.
+- **Stage 6:** provider-neutral current quotes, cache, timestamps and stale handling реализованы.
+- **Stage 7:** OHLCV и historical candles реализованы. Текущий контракт и operational semantics описаны в [Stage 7 architecture](docs/architecture/stage-7-candles-historical-data.md); indicator warm-up остаётся дальнейшим потребителем данных.
+- **Stage 8:** real market UI merged в PR #9 с данными из защищённого API и состояниями loading, unavailable, not-found и error. Compose использует явно включаемые детерминированные fake providers; интеграция с внешним live-провайдером пока не реализована.
+
+## Контекст будущих этапов 9–12 (не реализовано)
+
 - **Stage 9:** Swing High / Swing Low, EMA, ATR, RSI, volume, FVG, sessions, BTC context, Trend Score и матрица триады. До реализации требуется формализовать Trend Score/веса/пороги, матрицу триады, FVG formulas/mitigation, session timezone/DST; BTC context применим только к crypto, а XAU/USD, indices и yields требуют отдельной логики.
 - **Stage 10:** reports, publishing, history и безопасный аналитический язык.
 - **Stage 11:** AI explanation, notifications, preferences, rate limits и отсутствие финансовых обещаний.
@@ -46,7 +49,7 @@ Telegram Mini App для рыночной аналитики криптовал�
 
 ## Историческая граница Этапа 3
 
-На момент завершения Stage 3 были реализованы серверная проверка Telegram initData и создание/обновление Telegram-пользователей. Следующее — исторический список того, что ещё не было реализовано на Stage 3; Stage 4 sessions authorization находится в review и описана в [Stage 4 contract](docs/architecture/stage-4-sessions-api-authorization.md).
+На момент завершения Stage 3 были реализованы серверная проверка Telegram initData и создание/обновление Telegram-пользователей. Следующее — исторический список того, что ещё не было реализовано на Stage 3; Stage 4 sessions authorization впоследствии была завершена и merged и описана в [Stage 4 contract](docs/architecture/stage-4-sessions-api-authorization.md).
 
 - JWT и bearer-token authorization
 - Рыночные интеграции (Binance, OKX, CoinGecko, Gold API)
@@ -346,6 +349,8 @@ Celery воркер с задачами:
 
 - `heartbeat` — Проверка работоспособности
 - `test_task` — Тестовая задача
+- `quote.refresh` — Обновление текущих котировок через выделенную очередь `quotes`
+- `candles.sync` — Синхронизация закрытых свечей через выделенную очередь `candles`
 
 ## Cloudflare
 
@@ -381,7 +386,7 @@ docker compose exec redis redis-cli ping
 
 - Все данные на Dashboard являются демонстрационными
 - Нет реальных рыночных интеграций
-- Stage 4 HttpOnly cookie sessions реализованы в review и ещё не merged; JWT, refresh tokens и bearer-token persistence не реализованы
+- Stage 4 HttpOnly cookie sessions реализованы и merged; JWT, refresh tokens и bearer-token persistence намеренно не реализованы
 - Нет roles, permissions, IP/device/fingerprint metadata или retention cleanup policy; это не является частью Stage 4
 
 ## Telegram initData Validation
