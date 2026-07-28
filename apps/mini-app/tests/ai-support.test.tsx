@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Dashboard } from "../src/pages/dashboard";
+import { useModalStore } from "../src/shared/lib/store";
 
 const api = vi.hoisted(() => ({
   getAssets: vi.fn(),
@@ -30,6 +31,8 @@ function renderDashboard() {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
+  useModalStore.setState({ aiSupportOpen: false });
   api.getAssets.mockResolvedValue({
     items: [{
       id: "00000000-0000-4000-8000-000000000001", slug: "btc-usdt", symbol: "BTC/USDT", display_name: "Bitcoin",
@@ -59,14 +62,14 @@ describe("AI Support Modal", () => {
     expect(screen.getByText(/Раздел находится в разработке/)).toBeInTheDocument();
   });
 
-  it("closes modal when Понятно is clicked", async () => {
+  it("moves focus into the modal and restores it after closing", async () => {
     renderDashboard();
     await screen.findAllByText("119 000");
     const trigger = screen.getByRole("button", { name: "Открыть AI-поддержку" });
     trigger.focus();
     expect(trigger).toHaveFocus();
     fireEvent.click(trigger);
-    await waitFor(() => expect(screen.getByRole("dialog")).toHaveFocus());
+    await waitFor(() => expect(screen.getByText("Понятно")).toHaveFocus());
     fireEvent.click(screen.getByText("Понятно"));
     expect(screen.queryByText(/Раздел находится в разработке/)).not.toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("button", { name: "Открыть AI-поддержку" })).toHaveFocus());

@@ -11,6 +11,7 @@ interface ModalProps {
 export function Modal({ isOpen, onClose, title, children, returnFocusRef }: ModalProps) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
   const restorePreviousFocus = useCallback(() => {
@@ -45,13 +46,8 @@ export function Modal({ isOpen, onClose, title, children, returnFocusRef }: Moda
     if (!isOpen) return;
     previousFocusRef.current = returnFocusRef?.current
       ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+    closeButtonRef.current?.focus();
   }, [isOpen, returnFocusRef]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const frame = window.requestAnimationFrame(() => dialogRef.current?.focus());
-    return () => window.cancelAnimationFrame(frame);
-  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -61,8 +57,8 @@ export function Modal({ isOpen, onClose, title, children, returnFocusRef }: Moda
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className="relative z-10 mx-4 w-full max-w-sm rounded-[20px] bg-surface-elevated p-6"
         role="dialog"
+        className="relative z-10 mx-4 w-full max-w-sm rounded-[20px] bg-surface-elevated p-6"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
       >
@@ -73,6 +69,7 @@ export function Modal({ isOpen, onClose, title, children, returnFocusRef }: Moda
         )}
         {children}
         <button
+          ref={closeButtonRef}
           onClick={close}
           className="mt-4 w-full rounded-xl bg-accent-primary py-3 text-sm font-medium text-white touch-target"
         >
