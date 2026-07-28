@@ -10,6 +10,7 @@ const repositoryRoot = path.resolve(appDirectory, "../..");
 const outputDirectory = path.join(repositoryRoot, "artifacts/stage-8-prime-unit");
 const baseUrl = process.env.STAGE8_SCREENSHOT_URL ?? "http://127.0.0.1:4000";
 const systemChromium = process.env.PLAYWRIGHT_CHROMIUM_PATH ?? "/usr/bin/chromium";
+const REFERENCE_TIME = Date.parse("2026-07-28T18:00:00Z");
 
 const assets = [
   {
@@ -82,7 +83,7 @@ const timeframeMilliseconds = {
 function quote(slug, requestNumber) {
   const base = priceBySlug[slug];
   const price = base + requestNumber * 0.25;
-  const observedAt = new Date().toISOString();
+  const observedAt = new Date(REFERENCE_TIME).toISOString();
   return {
     slug,
     price: price.toFixed(2),
@@ -113,7 +114,7 @@ function quote(slug, requestNumber) {
 
 function candles(slug, timeframe) {
   const duration = timeframeMilliseconds[timeframe];
-  const now = Date.now();
+  const now = REFERENCE_TIME;
   const latestOpen = Math.floor(now / duration) * duration - duration;
   const base = priceBySlug[slug];
   const instrumentSeed = slug === "btc-usdt" ? 0.35 : slug === "eth-usdt" ? 1.15 : 2.1;
@@ -171,6 +172,7 @@ async function main() {
     reducedMotion: "reduce",
   });
   const page = await context.newPage();
+  await page.clock.setFixedTime(REFERENCE_TIME);
   const runtimeErrors = [];
   const requestedSeries = new Set();
   let quoteRequestNumber = 0;
