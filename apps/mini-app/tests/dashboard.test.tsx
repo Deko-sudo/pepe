@@ -16,14 +16,18 @@ const api = vi.hoisted(() => ({
   getQuotes: vi.fn(),
   getCandles: vi.fn(),
 }));
-const auth = vi.hoisted(() => ({ state: "valid" as string }));
+const auth = vi.hoisted(() => ({
+  state: "valid" as string,
+  telegramInitState: "TG_READY" as string,
+  diagnosticCode: null as string | null,
+}));
 
 vi.mock("../src/shared/api/market", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/shared/api/market")>()),
   ...api,
 }));
 vi.mock("../src/shared/telegram", () => ({
-  useTelegramAuth: () => ({ state: auth.state }),
+  useTelegramAuth: () => auth,
 }));
 
 const assets = [
@@ -94,6 +98,8 @@ function renderDashboard() {
 
 beforeEach(() => {
   auth.state = "valid";
+  auth.telegramInitState = "TG_READY";
+  auth.diagnosticCode = null;
   api.getAssets.mockReset().mockResolvedValue({ items: assets, next_cursor: null });
   api.getQuotes.mockReset().mockResolvedValue({
     items: [
@@ -110,6 +116,31 @@ beforeEach(() => {
 });
 
 describe("Stage 8 home dashboard", () => {
+  it("shows the safe frontend build identifier on the authenticated dashboard", async () => {
+    renderDashboard();
+
+    await screen.findAllByText("119 000");
+    expect(screen.getByLabelText("Сборка Mini App")).toHaveTextContent(
+      /^[a-zA-Z0-9._-]+$/,
+    );
+  });
+
+  it.each([
+    ["browser", "TG_INIT_TIMEOUT", "Telegram не завершил инициализацию Mini App."],
+    ["invalid", "AUTH_EXCHANGE_FAILED", "Не удалось подтвердить запуск через Telegram."],
+    ["invalid", "SESSION_HEADER_MISSING", "Не удалось подтвердить запуск через Telegram."],
+  ])("shows safe Russian auth diagnostics for %s / %s", (state, code, message) => {
+    auth.state = state;
+    auth.telegramInitState = code === "TG_INIT_TIMEOUT" ? "TG_INIT_TIMEOUT" : "TG_READY";
+    auth.diagnosticCode = code;
+
+    renderDashboard();
+
+    expect(screen.getByRole("alert")).toHaveTextContent(message);
+    expect(screen.getByRole("alert")).toHaveTextContent(code);
+    expect(screen.getByRole("alert")).toHaveTextContent(/Сборка: [a-zA-Z0-9._-]+/);
+  });
+
   it("starts market queries immediately after authentication succeeds", async () => {
     auth.state = "browser";
     const { rerender, client } = renderDashboard();
@@ -312,7 +343,7 @@ describe("Stage 8 home dashboard", () => {
     renderDashboard();
     const chart = (await screen.findByRole("heading", { name: "Динамика цены" })).closest("section");
 
-    expect(within(chart as HTMLElement).getByText("120 000")).toBeInTheDocument();
+    expect(await within(chart as HTMLElement).findByText("120 000")).toBeInTheDocument();
     expect(within(chart as HTMLElement).queryByText("999 999")).not.toBeInTheDocument();
   });
 

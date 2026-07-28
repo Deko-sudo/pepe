@@ -1,6 +1,8 @@
 import { ApiError } from "./api";
 
 export type DiagnosticCode =
+  | "TG_INIT_WAITING"
+  | "TG_READY"
   | "TG_INIT_UNAVAILABLE"
   | "TG_INIT_TIMEOUT"
   | "AUTH_EXCHANGE_FAILED"

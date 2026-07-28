@@ -165,8 +165,13 @@ class BrowserMockBridge implements TelegramBridge {
 }
 
 export function createTelegramBridge(): TelegramBridge {
-  if (isTelegramWebView()) {
-    return new TelegramWebAppBridge();
-  }
+  return createTelegramBridgeIfAvailable() ?? createBrowserBridge();
+}
+
+export function createTelegramBridgeIfAvailable(): TelegramBridge | null {
+  return isTelegramWebView() ? new TelegramWebAppBridge() : null;
+}
+
+export function createBrowserBridge(): TelegramBridge {
   return new BrowserMockBridge();
 }

@@ -1,6 +1,6 @@
 FROM node:20-alpine AS builder
 
-ARG VITE_BUILD_ID=dev
+ARG VITE_BUILD_ID
 ENV VITE_BUILD_ID=${VITE_BUILD_ID}
 
 WORKDIR /app
@@ -9,7 +9,7 @@ COPY package.json package-lock.json* ./
 RUN npm ci
 
 COPY . .
-RUN npm run build
+RUN test -n "$VITE_BUILD_ID" && test "$VITE_BUILD_ID" != "dev" && npm run build
 
 FROM nginx:alpine
 

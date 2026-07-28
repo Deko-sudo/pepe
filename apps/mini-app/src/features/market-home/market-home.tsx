@@ -337,7 +337,7 @@ function InformationCards({ asset }: { asset: Asset }) {
 
 export function MarketHome() {
   const location = useLocation();
-  const { state } = useTelegramAuth();
+  const { state, telegramInitState, diagnosticCode } = useTelegramAuth();
   const canLoadMarket = state === "valid";
   const [selectedSlug, setSelectedSlug] = useState("");
   const [timeframe, setTimeframe] = useState<Timeframe>("1h");
@@ -406,8 +406,12 @@ export function MarketHome() {
     return (
       <BlockingState
         title="Откройте Pepe через Telegram"
-        message="Рыночные данные доступны после безопасного запуска Mini App из чата с ботом."
-        diagnosticCode={state === "browser" ? "TG_INIT_UNAVAILABLE" : "AUTH_EXCHANGE_FAILED"}
+        message={state === "browser"
+          ? "Telegram не завершил инициализацию Mini App. Закройте окно и откройте приложение снова."
+          : "Не удалось подтвердить запуск через Telegram. Закройте окно и откройте приложение снова."}
+        diagnosticCode={diagnosticCode ?? (
+          telegramInitState === "TG_INIT_TIMEOUT" ? "TG_INIT_TIMEOUT" : "AUTH_EXCHANGE_FAILED"
+        )}
       />
     );
   }
@@ -441,7 +445,9 @@ export function MarketHome() {
     <main className="market-home">
       <header className="home-header safe-area-top">
         <div><span className="section-kicker">Market intelligence</span><h1>Pepe</h1></div>
-        <span className="home-status"><i />Secure</span>
+        <span className="home-status">
+          <i />Secure · <small aria-label="Сборка Mini App">{BUILD_ID}</small>
+        </span>
       </header>
       <HeroCard asset={selected} quote={selectedQuote} freshnessElapsedSeconds={freshnessElapsedSeconds} stats={stats} timeframe={timeframe} loading={quotes.isLoading} unavailable={quoteUnavailable} error={quotes.isError} onRetry={() => void quotes.refetch()} />
       <QuickActions />

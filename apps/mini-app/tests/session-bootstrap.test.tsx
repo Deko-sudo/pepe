@@ -1,14 +1,13 @@
 import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import { clearSessionToken } from "../src/shared/api";
 import { TelegramProvider } from "../src/shared/telegram/provider";
 import { useTelegramAuth } from "../src/shared/telegram/context";
 
 function installMockWebApp(initData: string, platform = "tdesktop") {
-  (window as Record<string, unknown>).Telegram = {
-    WebApp: {
+  const webApp = {
       ready: vi.fn(),
       expand: vi.fn(),
       initData,
@@ -18,16 +17,18 @@ function installMockWebApp(initData: string, platform = "tdesktop") {
       BackButton: { show: vi.fn(), hide: vi.fn(), onClick: vi.fn(), offClick: vi.fn() },
       HapticFeedback: { impactOccurred: vi.fn(), notificationOccurred: vi.fn() },
       showAlert: vi.fn(),
-    },
   };
+  (window as Record<string, unknown>).Telegram = { WebApp: webApp };
+  return webApp;
 }
 
 function Status() {
-  const { state, user, error, logout, logoutAll } = useTelegramAuth();
+  const { state, user, error, diagnosticCode, logout, logoutAll } = useTelegramAuth();
   return (
     <div>
       <span data-testid="status">{`${state}:${user?.first_name ?? ""}`}</span>
       <span data-testid="error">{error ?? ""}</span>
+      <span data-testid="diagnostic">{diagnosticCode ?? ""}</span>
       <button onClick={() => void logout().catch(() => undefined)}>Logout</button>
       <button onClick={() => void logoutAll().catch(() => undefined)}>Logout all</button>
     </div>
@@ -55,9 +56,108 @@ afterEach(() => {
   cleanup();
   delete (window as Record<string, unknown>).Telegram;
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 describe("session bootstrap", () => {
+  it("calls Telegram.WebApp.ready when the bridge is available immediately", async () => {
+    const webApp = installMockWebApp("signed-init-data");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(profile), { status: 200 }),
+    );
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("valid:Test"));
+    expect(webApp.ready).toHaveBeenCalledOnce();
+  });
+
+  it("waits for Telegram.WebApp to appear before starting the auth exchange", async () => {
+    vi.useFakeTimers();
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(profile), {
+          status: 200,
+          headers: { "X-Pepe-Session-Token": "desktop-session-token" },
+        }),
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify(profile), { status: 200 }));
+
+    renderProvider();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(screen.getByText(/TG_INIT_WAITING/)).toBeInTheDocument();
+
+    const webApp = installMockWebApp("signed-init-data");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(50);
+    });
+
+    expect(webApp.ready).toHaveBeenCalledOnce();
+    expect(fetchSpy).toHaveBeenCalled();
+    expect(screen.getByTestId("status")).toHaveTextContent("valid:Test");
+  });
+
+  it("waits for initData that appears after Telegram.WebApp.ready()", async () => {
+    vi.useFakeTimers();
+    let initData = "";
+    const webApp = installMockWebApp("");
+    Object.defineProperty(webApp, "initData", { configurable: true, get: () => initData });
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(profile), {
+          status: 200,
+          headers: { "X-Pepe-Session-Token": "desktop-session-token" },
+        }),
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify(profile), { status: 200 }));
+
+    renderProvider();
+    expect(webApp.ready).toHaveBeenCalledOnce();
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    initData = "signed-init-data";
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(50);
+    });
+
+    expect(screen.getByTestId("status")).toHaveTextContent("valid:Test");
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+  });
+
+  it("uses the browser fallback only after the bounded Telegram timeout", async () => {
+    vi.useFakeTimers();
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, { status: 401 }),
+    );
+
+    renderProvider();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(screen.getByText(/TG_INIT_WAITING/)).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+
+    expect(screen.getByTestId("status")).toHaveTextContent("browser:");
+    expect(screen.getByTestId("diagnostic")).toHaveTextContent("TG_INIT_TIMEOUT");
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("cleans up Telegram initialization timers on unmount", () => {
+    vi.useFakeTimers();
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 401 }));
+
+    const view = renderProvider();
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+
+    view.unmount();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it("uses an existing cookie session before Telegram exchange", async () => {
     installMockWebApp("signed-init-data");
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
@@ -137,7 +237,23 @@ describe("session bootstrap", () => {
     expect(fallbackHeaders.get("Authorization")).toBe("Bearer desktop-session-token");
   });
 
+  it("classifies a missing Telegram Desktop session header safely", async () => {
+    installMockWebApp("signed-init-data");
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(profile), { status: 200 }));
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("invalid:"));
+    expect(screen.getByTestId("diagnostic")).toHaveTextContent("SESSION_HEADER_MISSING");
+    expect(screen.getByTestId("error")).toHaveTextContent(
+      "Не удалось подтвердить запуск через Telegram.",
+    );
+  });
+
   it("keeps browser mode controlled after an unauthenticated session check", async () => {
+    vi.useFakeTimers();
     installMockWebApp("");
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")
@@ -145,7 +261,10 @@ describe("session bootstrap", () => {
 
     renderProvider();
 
-    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("browser:"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+    expect(screen.getByTestId("status")).toHaveTextContent("browser:");
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
