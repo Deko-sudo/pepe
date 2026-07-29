@@ -287,7 +287,9 @@ def test_crypto_quote_exposes_the_configured_crypto_stale_threshold() -> None:
     from app.modules.market_data.quotes import _response_from_quote
 
     instrument = _make_instrument_with_class("crypto_spot", "btc-usdt")
-    response = _response_from_quote(instrument, make_durable_quote(), NOW)
+    response = _response_from_quote(
+        cast(Any, instrument), cast(Any, make_durable_quote()), NOW
+    )
 
     assert response is not None
     assert response.stale_after_seconds == 60
@@ -297,7 +299,9 @@ def test_reference_quote_exposes_the_configured_reference_stale_threshold() -> N
     from app.modules.market_data.quotes import _response_from_quote
 
     instrument = _make_instrument_with_class("metal_fx_spot", "xau-usd")
-    response = _response_from_quote(instrument, make_durable_quote(), NOW)
+    response = _response_from_quote(
+        cast(Any, instrument), cast(Any, make_durable_quote()), NOW
+    )
 
     assert response is not None
     assert response.stale_after_seconds == 300
@@ -331,6 +335,10 @@ def test_reference_quote_becomes_stale_at_reference_threshold() -> None:
 def _response_from_quote_fresh(instrument: SimpleNamespace) -> CurrentQuoteResponse:
     from app.modules.market_data.quotes import _response_from_quote
 
-    response = _response_from_quote(instrument, make_durable_quote(), NOW)
+    response = _response_from_quote(
+        cast(Any, instrument), cast(Any, make_durable_quote()), NOW
+    )
+    assert response is not None
+    return response
     assert response is not None
     return response
