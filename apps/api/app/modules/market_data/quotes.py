@@ -118,6 +118,7 @@ def _response_from_quote(
     quote: LatestMarketQuote,
     now: datetime,
 ) -> CurrentQuoteResponse | None:
+    stale_after, _ = settings.quote_freshness_for(instrument.asset_class)
     response = CurrentQuoteResponse.from_values(
         slug=instrument.slug,
         price=quote.price,
@@ -141,6 +142,7 @@ def _response_from_quote(
         delay_class=DelayClass(quote.delay_class),
         source_label=quote.source_label,
         venue_label=quote.source_venue,
+        stale_after_seconds=stale_after,
     )
     return _apply_freshness(response, instrument.asset_class, now)
 
@@ -155,4 +157,10 @@ def _apply_freshness(
     if age_seconds >= hard_expire_after:
         return None
     data_status = DataStatus.STALE if age_seconds >= stale_after else DataStatus.FRESH
-    return quote.model_copy(update={"age_seconds": age_seconds, "data_status": data_status})
+    return quote.model_copy(
+        update={
+            "age_seconds": age_seconds,
+            "data_status": data_status,
+            "stale_after_seconds": stale_after,
+        },
+    )

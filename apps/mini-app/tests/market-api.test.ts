@@ -21,6 +21,7 @@ const quote = {
   observed_at: "2026-01-01T00:00:00Z",
   received_at: "2026-01-01T00:00:00Z",
   age_seconds: 1,
+  stale_after_seconds: 60,
   provenance: {
     source_label: "Synthetic test source",
     venue_label: null,

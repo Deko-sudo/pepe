@@ -40,6 +40,7 @@ class CurrentQuoteResponse(BaseModel):
     observed_at: datetime
     received_at: datetime
     age_seconds: int
+    stale_after_seconds: int = 0
     provenance: QuoteProvenanceResponse
 
     @classmethod
@@ -68,6 +69,7 @@ class CurrentQuoteResponse(BaseModel):
         delay_class: DelayClass,
         source_label: str,
         venue_label: str | None,
+        stale_after_seconds: int = 0,
     ) -> CurrentQuoteResponse:
         return cls(
             slug=slug,
@@ -87,6 +89,7 @@ class CurrentQuoteResponse(BaseModel):
             observed_at=observed_at.astimezone(UTC),
             received_at=received_at.astimezone(UTC),
             age_seconds=age_seconds,
+            stale_after_seconds=stale_after_seconds,
             provenance=QuoteProvenanceResponse(
                 source_label=source_label,
                 venue_label=venue_label,

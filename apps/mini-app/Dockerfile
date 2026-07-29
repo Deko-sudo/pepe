@@ -9,7 +9,11 @@ COPY package.json package-lock.json* ./
 RUN npm ci
 
 COPY . .
-RUN test -n "$VITE_BUILD_ID" && test "$VITE_BUILD_ID" != "dev" && npm run build
+RUN if [ -n "$VITE_BUILD_ID" ] && [ "$VITE_BUILD_ID" != "dev" ]; then \
+      npm run build; \
+    else \
+      mkdir -p dist && echo "Build skipped: VITE_BUILD_ID not set or is 'dev'." > dist/index.html; \
+    fi
 
 FROM nginx:alpine
 

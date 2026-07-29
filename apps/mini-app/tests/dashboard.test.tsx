@@ -54,6 +54,7 @@ const quoteFor = (slug: string, price: string, dataStatus = "fresh") => ({
   observed_at: "2026-07-28T08:00:00Z",
   received_at: "2026-07-28T08:00:01Z",
   age_seconds: 1,
+  stale_after_seconds: 60,
   provenance: {
     source_label: "Synthetic test source",
     venue_label: null,

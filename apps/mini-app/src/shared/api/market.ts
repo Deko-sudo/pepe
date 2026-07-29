@@ -26,6 +26,7 @@ export const QuoteSchema = z.object({
   change_24h: NullableDecimalSchema, change_percent_24h: NullableDecimalSchema,
   base_volume_24h: NullableDecimalSchema, quote_volume_24h: NullableDecimalSchema,
   market_status: z.string(), data_status: z.string(), observed_at: z.string(), received_at: z.string(), age_seconds: z.number(),
+  stale_after_seconds: z.number(),
   provenance: z.object({ source_label: z.string(), venue_label: z.string().nullable(), market_type: z.string(), price_type: z.string(), delay_class: z.string() }),
 }).passthrough();
 export type Quote = z.infer<typeof QuoteSchema>;

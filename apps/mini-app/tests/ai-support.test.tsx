@@ -45,7 +45,7 @@ beforeEach(() => {
   api.getQuotes.mockResolvedValue({
     items: [{
       slug: "btc-usdt", price: "119000.00", bid: null, ask: null, mid: null, market_status: "open",
-      data_status: "fresh", observed_at: "2026-07-28T05:00:00Z", received_at: "2026-07-28T05:00:01Z", age_seconds: 1,
+      data_status: "fresh", observed_at: "2026-07-28T05:00:00Z", received_at: "2026-07-28T05:00:01Z", age_seconds: 1, stale_after_seconds: 60,
       provenance: { source_label: "Synthetic test source", venue_label: null, market_type: "spot", price_type: "last", delay_class: "demo" },
     }],
     unavailable: [],
