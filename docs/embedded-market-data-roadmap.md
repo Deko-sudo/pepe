@@ -89,24 +89,24 @@ No alternative is recommended in this roadmap. A future owner-approved research 
 
 ### 5.1 Configuration pattern — PROPOSED
 
-Introduce a typed, server-authoritative `MarketDataMode = demo | embedded | live` plus a typed read-only frontend capability document. The frontend must consume an authenticated same-origin capability response/build-time public mode only; it must never receive secret keys or make provider API calls. Provider-specific display mapping is data, not an API credential or a `provider_instrument_mappings` replacement.
+Introduce a typed runtime `MarketDataMode = demo | embedded | live | unavailable` plus a typed read-only frontend capability document. `unavailable` is a deliberate kill-switch state, not a data mode. API and worker startup MUST consume one shared, validated deployment-mode authority. The authenticated same-origin capability response is the only frontend authority; build-time public metadata may be cosmetic only and MUST NOT enable a capability. Missing, unknown, inconsistent, or mismatched runtime state resolves to `unavailable`. The frontend must never receive secret keys or make provider API calls. Provider-specific display mapping is data, not an API credential or a `provider_instrument_mappings` replacement.
 
-Mode selection MUST be validated in API and worker startup. Production is invalid unless exactly one approved mode is selected. `embedded` production is invalid if either fake worker path can write quotes/candles. Unknown, inconsistent, or missing mode resolves to **unavailable**, not demo or live.
+Mode selection MUST be validated in API and worker startup. Production is invalid unless exactly one approved mode or the explicit `unavailable` kill switch is selected. `embedded` production is invalid if either fake worker path can write quotes/candles. The shared runtime authority must support an immediate transition to `unavailable`, and API, workers, scheduler, and frontend capability response must converge on that state before any chart capability is rendered.
 
 ### 5.2 Capability matrix
 
-| Capability | `demo` | `embedded` | `live` |
-|---|---|---|---|
-| Chart display | Pepe synthetic chart; visible DEMO | Official provider widget only, visible source/attribution | Pepe chart from authorized normalized candles |
-| Quote cards | Explicit DEMO only outside production/demo environment | Hidden or chart-only until separately approved lawful source | Normalized authorized quote with provenance/freshness |
-| Candle storage | Test/dev synthetic only | No widget ingestion or persistence | Authorized normalized PostgreSQL candles |
-| Server analytics | Test fixtures only | Unavailable | Authorized source only |
-| Reports | Clearly synthetic/test only | Pepe text/configuration only; no raw/widget export | Authorized data subject to rights |
-| AI commentary | Must know DEMO | Help/navigation only; no iframe-data claims | Authorized provenance-bearing data only |
-| Price notifications | Disabled except test harness | Disabled | Authorized machine-readable source only |
-| Historical data | Test/dev only | Unavailable | Authorized provider history |
-| Attribution | DEMO label | Mandatory vendor branding/source/delay | Provider provenance/contractual attribution |
-| Offline/fallback | DEMO/unavailable label | Unavailable plus safe external link when approved | Stale/unavailable per freshness policy |
+| Capability | `demo` | `embedded` | `live` | `unavailable` |
+|---|---|---|---|---|
+| Chart display | Pepe synthetic chart; visible DEMO | Official provider widget only, visible source/attribution | Pepe chart from authorized normalized candles | Unavailable state only |
+| Quote cards | Explicit DEMO only outside production/demo environment | Hidden or chart-only until separately approved lawful source | Normalized authorized quote with provenance/freshness | Unavailable state only |
+| Candle storage | Test/dev synthetic only | No widget ingestion or persistence | Authorized normalized PostgreSQL candles | No writes |
+| Server analytics | Test fixtures only | Unavailable | Authorized source only | Unavailable |
+| Reports | Clearly synthetic/test only | Pepe text/configuration only; no raw/widget export | Authorized data subject to rights | Unavailable/reduced state |
+| AI commentary | Must know DEMO | Help/navigation only; no iframe-data claims | Authorized provenance-bearing data only | Help only; no market claims |
+| Price notifications | Disabled except test harness | Disabled | Authorized machine-readable source only | Disabled |
+| Historical data | Test/dev only | Unavailable | Authorized provider history | Unavailable |
+| Attribution | DEMO label | Mandatory vendor branding/source/delay | Provider provenance/contractual attribution | No provider attribution |
+| Offline/fallback | DEMO/unavailable label | Unavailable plus safe external link when approved | Stale/unavailable per freshness policy | Safe unavailable state; no synthetic substitute |
 
 The UI must render mode and capability state before starting quote/candle queries. It MUST not use empty embedded responses to trigger a fake-data fallback.
 
@@ -116,7 +116,7 @@ The UI must render mode and capability state before starting quote/candle querie
 
 **Preserve:** Docker topology, API/worker separation, Vite Mini App, nginx proxy and existing UI system.
 
-**Future work:** typed mode configuration; a narrow domain inventory; CSP response policy and test; explicit startup validation; build-time public non-secret display metadata; deterministic unavailable fallback. Do not add a broad wildcard CSP or disable security headers.
+**Future work:** typed shared runtime mode configuration; a narrow domain inventory; CSP response policy and test; explicit startup validation; authenticated runtime capability response; deterministic unavailable fallback. Do not add a broad wildcard CSP or disable security headers.
 
 **Acceptance:** unknown mode fails startup or renders an authenticated safe unavailable state; no provider domains appear before owner approval; no migration.
 
@@ -130,7 +130,7 @@ No functional or schema change. Do not persist provider cookie IDs, widget telem
 
 ### Stage 4 — Sessions and API authorization
 
-No functional change to host-only cookies or fallback token handling. A cross-origin iframe cannot be a Pepe authenticated API client. The widget receives a static official URL/snippet and never a `withSessionAuth()` request. Network tests must prove no `Authorization`, `X-Pepe-Session-*`, Cookie, initData, session ID, or user identifier leaves Pepe for an embedded-provider origin.
+No functional change to host-only cookies or fallback token handling. A cross-origin iframe cannot be a Pepe authenticated API client. Embedded mode requires an iframe-only provider document; vendor-hosted JavaScript MUST NOT execute in Pepe's top-level origin unless a separate owner-approved privileged-code security review expressly authorizes it. The iframe receives a static approved URL and never a `withSessionAuth()` request. Network tests must prove no `Authorization`, `X-Pepe-Session-*`, Cookie, initData, session ID, or user identifier leaves Pepe for an embedded-provider origin.
 
 ### Stage 5 — Asset catalog and provider abstraction
 
@@ -149,19 +149,19 @@ Mapping tests must reject missing venue, unsupported timeframe, unknown canonica
 3. Add a separate lawful machine-readable quote source only through a later, separately approved live-mode contract.
 4. Permit explicit DEMO cards only in a non-production demo environment; never alongside embedded charts as if both are live.
 
-Embedded mode must make current quote API use unnecessary for market UI. If an authenticated endpoint remains callable, it must return an explicit typed `not_available_in_mode` capability response rather than old fake values or a misleading empty success. Loading, unavailable, delayed/unknown-delay, market-closed, unsupported, and provider-failure states have distinct labels. Never calculate bid, ask, mid, spread, 24h values, freshness, or price changes from the widget.
+PR A MUST select, version, and test one discriminated unavailable response before PR C. For quote and candle capabilities unavailable in embedded mode, use HTTP `409`, `Cache-Control: private, no-store`, and `{ "code": "market_data_unavailable", "mode": "embedded", "capability": "quotes" | "candles", "reason": "not_available_in_mode" }`; empty or successful substitute responses are forbidden. `getQuote`, `getCandles`, `MarketChart`, and their API clients must consume that one contract consistently. Embedded mode must make current quote API use unnecessary for market UI. Loading, unavailable, delayed/unknown-delay, market-closed, unsupported, and provider-failure states have distinct labels. Never calculate bid, ask, mid, spread, 24h values, freshness, or price changes from the widget.
 
 ### Stage 7 — Candles and historical data
 
 Preserve `market_candles`, authenticated candle endpoint, queue names, leases, retry model, `CandleTimeframe`, and live-provider extension points. In production embedded mode workers must not schedule/execute fake refresh/sync writes, and no widget data may enter PostgreSQL, Redis, or server analytics.
 
-The candle endpoint's embedded-mode contract should be a typed, cache-control-preserving unavailable response (or explicit capability envelope chosen in PR A), not an empty candle set that `MarketChart` could render ambiguously. The frontend must switch to the embedded component before calling `getCandles`. Tests must prove zero widget-origin candle records, zero iframe extraction code, no accidental DEMO fallback, and intact future live interfaces. XAU session-aware expected-bar/gap validation remains a **live-ingestion prerequisite**, not an embedded workaround.
+The candle endpoint's embedded-mode contract is the single versioned `market_data_unavailable` response selected in PR A, with HTTP `409` and `Cache-Control: private, no-store`; it is never an empty candle set or successful substitute. The frontend must switch to the embedded component before calling `getCandles`. Tests must prove zero widget-origin candle records, zero iframe extraction code, no accidental DEMO fallback, and intact future live interfaces. XAU session-aware expected-bar/gap validation remains a **live-ingestion prerequisite**, not an embedded workaround.
 
 ### Stage 8 — Real market UI adaptation
 
 This is the principal future UI work.
 
-**Component contract:** `EmbeddedMarketChart` accepts only approved display mapping, timeframe, non-secret presentation config, and callbacks for local retry/external navigation. It uses an iframe or official vendor-supported embed mechanism; it has no `contentWindow`, DOM-read, message parsing, request interception, proxy, scraper, or data callback.
+**Component contract:** `EmbeddedMarketChart` accepts only approved display mapping, timeframe, non-secret presentation config, and callbacks for local retry/external navigation. It uses an iframe-only provider document with the strictest sandbox compatible with the approved widget; it has no vendor script in Pepe's top-level origin, `contentWindow`, DOM-read, message parsing, request interception, proxy, scraper, or data callback. A provider requiring top-level vendor JavaScript is blocked pending a separate privileged-code security review and owner approval.
 
 **UX requirements:**
 
@@ -209,10 +209,10 @@ All PRs below are **PROPOSED**. Every PR stops before merge until owner decision
 - **Forbidden:** widget, provider calls, credentials, provider mappings, persistence migration, Stage 9.
 - **Expected areas:** API/worker settings, Mini App capability client/provider, market endpoint contracts, tests, Compose defaults only when implementing fail-safe validation.
 - **Migrations:** none expected.
-- **Tests:** all three modes; unknown/inconsistent mode fails closed; API capability/quote/candle mode responses; no production fake writes.
+- **Tests:** all four states (`demo`, `embedded`, `live`, `unavailable`); unknown/inconsistent mode fails closed; one versioned HTTP 409 `market_data_unavailable` response contract with body/cache semantics across API clients and chart consumers; API capability/quote/candle mode responses; no production fake writes.
 - **Manual smoke:** demo regression; embedded mode shows unavailable placeholder, no iframe; live mode remains unavailable without an authorized provider.
 - **Security:** no secret in public config; mode cannot downgrade to demo; no session regression.
-- **Acceptance/rollback:** independently deployable, feature disabled by default; rollback selects safe unavailable state, not fake data.
+- **Acceptance/rollback:** independently deployable, feature disabled by default; a tested shared runtime transition selects explicit `unavailable`, not fake data.
 - **Dependencies/stopping point:** owner approves mode model and fake-provider policy; stop before any external domain or widget integration.
 
 ### PR B — Embedded display mapping and chart component
@@ -274,7 +274,7 @@ Automated future coverage must include:
 1. Mode configuration validation and capability matrix unit tests.
 2. Canonical symbol and timeframe mapping tests, including XAU equivalence rejection.
 3. Quote-card and candle-API behaviour per mode.
-4. Fake-provider production fail-closed tests across API, worker, scheduler, and Compose/default configuration contract.
+4. Fake-provider production fail-closed tests against effective production configuration and deployment/profile overrides, not defaults alone: when `embedded` is selected, independently supplied quote and candle fake flags are both rejected across API, scheduler, direct worker entry points, and Compose/deployment-derived settings.
 5. CSP/domain allowlist tests; no arbitrary frame source.
 6. URL/request construction tests proving no session header, cookie, initData, token, user identity, or provider key is sent to a widget/fallback origin.
 7. Static/code-level tests prohibiting iframe DOM read, `contentDocument`, provider request interception, and data-persistence paths in embedded component scope where practical.
@@ -288,7 +288,7 @@ Automated browser tests do **not** prove Telegram device compatibility. Manual a
 
 ### Security model
 
-- Same-origin Pepe API keeps current session/auth model; third-party widget is isolated in a cross-origin frame.
+- Same-origin Pepe API keeps current session/auth model; third-party widget is isolated in a cross-origin, iframe-only provider document. Vendor JavaScript must not execute in the Pepe top-level origin without a separate privileged-code approval.
 - Only approved frame/source domains are allowed; no wildcard CSP and no arbitrary mapping URL.
 - No provider credentials are used in embedded mode. No iframe scrape/proxy/network interception is permitted.
 - External links are generated from static allowlisted templates and canonical display mapping; user input cannot select a host.
