@@ -85,10 +85,12 @@ async def fetch_quotes(
 ```
 
 - Return exactly one `NormalizedQuote` per `QuoteRequest`, with matching `instrument_id`.
-- Required: last price and UTC timestamps. Bid and ask MAY be null when the provider does not
-  supply them; `mid` MAY be derived only when both bid and ask exist. The adapter MUST NOT
-  fabricate bid, ask, mid, or spread. When values exist, validation enforces positive prices,
-  `bid ≤ ask`, and `mid = (bid+ask)/2`; freshness and deterministic event-ID validation remain required.
+- Supply all dataclass fields, but optional fields (including bid, ask, mid, 24-hour fields,
+  volumes, source venue, provider instrument ID, and provider event ID) MAY be null. Required
+  validation includes positive last price and UTC-aware timestamps. Bid/ask/mid are positive when
+  present; `bid ≤ ask` applies when both exist; a supplied `mid` must equal `(bid + ask) / 2`.
+  The adapter MUST NOT fabricate bid, ask, mid, or spread. Provider event IDs are optional;
+  deterministic IDs are a provider/persistence ordering convention, not a model requirement.
 - Failures: raise an exception (caught → `PROVIDER_FAILED` retryable → Celery backoff).
 
 ### HistoricalCandleProvider
@@ -97,7 +99,14 @@ async def fetch_quotes(
 async def fetch_candles(self, request: CandleRequest) -> tuple[NormalizedCandle, ...]
 ```
 
-- Return closed candles for expected open-session bars in `[from_time, to_time]` (aligned to timeframe boundaries).
+- Each stored candle is half-open `[open_time, close_time)`. The **current internal request** is
+  inclusive at both aligned open-time boundaries: `from_time ≤ open_time ≤ to_time`; `to_time` is
+  the newest eligible closed candle's open time. Pages contain at most 500 open times, advance as
+  `next_from = previous_to + timeframe`, and reject omitted first/last boundaries or fixed-grid gaps.
+  A provider with inclusive bounds must be normalized to this exact range; duplicate page-boundary
+  candles are deduplicated only when identical and conflicting duplicates are invalid. A provider
+  with exclusive bounds must be adapted to include the requested final open time. Session-aware XAU
+  changes will require replacing fixed-grid boundary/gap checks with expected-open-session checks.
 - `NormalizedCandle`: OHLC, optional base/quote volume, trade count, provenance labels, UTC timestamps.
 - Service pages at 500 candles; validates alignment, contiguity, no gaps/duplicates.
 
@@ -475,7 +484,12 @@ data-retention constraints override a numerical score.
 **Rationale (subject to hard preconditions and owner approval):**
 - Crypto market data from Binance/Bybit is **free, real-time, keyless**, with all 6 native intervals and 1,000 candles/request.
 - XAU/USD from Twelve Data provides **spot gold** with all 6 native intervals, 20+ years of history, and WebSocket streaming.
-- Total cost: **$29/month** (Twelve Data Grow for XAU only; crypto is free).
+- Cost is profile-specific, not universal: local development assumes synthetic/demo data and no
+  live-provider purchase; initial launch (Profile B, 3 instruments) estimates **$29/month** for
+  Twelve Data Grow for XAU while crypto data is public; growth (Profile C, 10 instruments, two
+  workers) estimates **$99–$191/month** for Twelve Data Pro while crypto remains public. Pricing,
+  credits, market entitlements, exchange, retention, redistribution and licensing costs MUST be
+  reverified before purchase and may increase these estimates.
 - The split provides **partial outage isolation** — if the crypto exchange is down, XAU data continues, and vice versa.
 - The split architecture is more resilient and cheaper than any single-provider option for the same coverage.
 
