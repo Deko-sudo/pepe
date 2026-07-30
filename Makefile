@@ -1,5 +1,8 @@
 .PHONY: help up down build rebuild logs ps test lint format typecheck migrate migration shell-api shell-db clean
 
+MINI_APP_BUILD_ID ?= $(shell git rev-parse --short=8 HEAD)
+export MINI_APP_BUILD_ID
+
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 

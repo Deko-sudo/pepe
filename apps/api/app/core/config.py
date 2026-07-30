@@ -1,3 +1,4 @@
+from typing import Literal
 from urllib.parse import urlsplit
 
 from pydantic import AliasChoices, Field, model_validator
@@ -39,6 +40,8 @@ class Settings(BaseSettings):
     session_idle_ttl_seconds: int = 604_800
     session_max_active: int = 5
     session_cookie_secure: bool = False
+    session_cookie_same_site: Literal["lax", "strict", "none"] = "lax"
+    session_cookie_partitioned: bool = False
     session_allowed_origins: str = (
         "http://localhost:3000,http://localhost:4000,http://localhost:8080"
     )
@@ -72,6 +75,14 @@ class Settings(BaseSettings):
             raise ValueError("session_max_active must equal 5 for the approved contract")
         if self.environment == "production" and not self.session_cookie_secure:
             raise ValueError("session_cookie_secure must be true in production")
+        if self.session_cookie_same_site == "none" and not self.session_cookie_secure:
+            raise ValueError(
+                "session_cookie_secure must be true when session_cookie_same_site is none",
+            )
+        if self.session_cookie_partitioned and self.session_cookie_same_site != "none":
+            raise ValueError(
+                "session_cookie_same_site must be none when session_cookie_partitioned is true",
+            )
         if self.environment == "production" and not self.session_origins:
             raise ValueError("session_allowed_origins must not be empty in production")
         if self.environment == "production" and self.quote_fake_provider_enabled:

@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import sys
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command, CommandStart
@@ -20,13 +21,25 @@ def create_bot() -> Bot | None:
     return Bot(token=token)
 
 
+def versioned_mini_app_url(base_url: str, build_id: str) -> str:
+    parts = urlsplit(base_url)
+    query = dict(parse_qsl(parts.query, keep_blank_values=True))
+    query["v"] = build_id
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+
+
 def setup_handlers(dp: Dispatcher) -> None:
     @dp.message(CommandStart())
     async def cmd_start(message: types.Message) -> None:
         builder = InlineKeyboardBuilder()
         builder.button(
             text="Открыть Pepe",
-            web_app=types.WebAppInfo(url=bot_settings.mini_app_url),
+            web_app=types.WebAppInfo(
+                url=versioned_mini_app_url(
+                    bot_settings.mini_app_url,
+                    bot_settings.mini_app_build_id,
+                ),
+            ),
         )
         builder.adjust(1)
 

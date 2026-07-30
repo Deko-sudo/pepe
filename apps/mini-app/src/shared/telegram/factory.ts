@@ -7,6 +7,7 @@ declare global {
         ready(): void;
         expand(): void;
         initData: string;
+        platform?: string;
         colorScheme: "light" | "dark";
         themeParams: {
           bg_color?: string;
@@ -69,6 +70,14 @@ class TelegramWebAppBridge implements TelegramBridge {
       return getWebApp().initData ?? "";
     } catch {
       return "";
+    }
+  }
+
+  requiresSessionHeaderFallback(): boolean {
+    try {
+      return getWebApp().platform === "tdesktop";
+    } catch {
+      return false;
     }
   }
 
@@ -138,6 +147,9 @@ class BrowserMockBridge implements TelegramBridge {
   getInitData(): string {
     return "";
   }
+  requiresSessionHeaderFallback(): boolean {
+    return false;
+  }
   getColorScheme(): "light" | "dark" {
     return "dark";
   }
@@ -153,8 +165,13 @@ class BrowserMockBridge implements TelegramBridge {
 }
 
 export function createTelegramBridge(): TelegramBridge {
-  if (isTelegramWebView()) {
-    return new TelegramWebAppBridge();
-  }
+  return createTelegramBridgeIfAvailable() ?? createBrowserBridge();
+}
+
+export function createTelegramBridgeIfAvailable(): TelegramBridge | null {
+  return isTelegramWebView() ? new TelegramWebAppBridge() : null;
+}
+
+export function createBrowserBridge(): TelegramBridge {
   return new BrowserMockBridge();
 }

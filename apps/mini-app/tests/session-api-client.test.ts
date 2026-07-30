@@ -1,12 +1,20 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   ApiError,
+  activateSessionToken,
+  clearSessionToken,
   exchangeTelegramSession,
   getCurrentUser,
   logout,
   logoutAll,
 } from "../src/shared/api";
+import { withSessionAuth } from "../src/shared/api/session-token";
+
+afterEach(() => {
+  clearSessionToken();
+  vi.restoreAllMocks();
+});
 
 describe("session API client", () => {
   it("uses credentials include for cookie-session calls", async () => {
@@ -19,7 +27,10 @@ describe("session API client", () => {
           created_at: "2026-07-24T00:00:00Z",
           updated_at: "2026-07-24T00:00:00Z",
         }),
-        { status: 200 },
+        {
+          status: 200,
+          headers: { "X-Pepe-Session-Token": "desktop-session-token" },
+        },
       );
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(profileResponse);
 
@@ -49,6 +60,93 @@ describe("session API client", () => {
       "/api/v1/auth/logout-all",
       expect.objectContaining({ credentials: "include" }),
     );
+  });
+
+  it("uses an in-memory bearer token without browser persistence", async () => {
+    const profile = {
+      id: "11111111-1111-1111-1111-111111111111",
+      telegram_id: 1,
+      first_name: "Test",
+      created_at: "2026-07-24T00:00:00Z",
+      updated_at: "2026-07-24T00:00:00Z",
+    };
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(profile), {
+          status: 200,
+          headers: { "X-Pepe-Session-Token": "desktop-session-token" },
+        }),
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify(profile), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(profile), { status: 200 }));
+
+    const exchange = await exchangeTelegramSession("signed-init-data", true);
+    expect(exchange.sessionToken).not.toBeNull();
+    activateSessionToken(exchange.sessionToken!);
+    await getCurrentUser();
+
+    expect(fetchSpy.mock.calls[1][0]).toBe("/api/v1/users/me");
+    expect(fetchSpy.mock.calls[1][1]).toEqual(expect.objectContaining({ credentials: "include" }));
+    const authHeaders = new Headers(fetchSpy.mock.calls[1][1]?.headers);
+    expect(authHeaders.get("Authorization")).toBe("Bearer desktop-session-token");
+    clearSessionToken();
+    await getCurrentUser();
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      3,
+      "/api/v1/users/me",
+      { credentials: "include" },
+    );
+  });
+
+  it.each([
+    new Headers({ "X-Trace": "headers-instance" }),
+    [["X-Trace", "tuple-array"]] satisfies [string, string][],
+    { "X-Trace": "plain-object" },
+  ])("preserves every supported HeadersInit variant", (inputHeaders) => {
+    activateSessionToken("desktop-session-token");
+
+    const request = withSessionAuth({ headers: inputHeaders });
+    const headers = new Headers(request.headers);
+
+    expect(headers.get("X-Trace")).not.toBeNull();
+    expect(headers.get("Authorization")).toBe("Bearer desktop-session-token");
+  });
+
+  it("classifies a requested fallback exchange without the fallback header", async () => {
+    const profile = {
+      id: "11111111-1111-1111-1111-111111111111",
+      telegram_id: 1,
+      first_name: "Test",
+      created_at: "2026-07-24T00:00:00Z",
+      updated_at: "2026-07-24T00:00:00Z",
+    };
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(profile), { status: 200 }),
+    );
+
+    await expect(exchangeTelegramSession("signed-init-data", true)).rejects.toMatchObject<ApiError>({
+      code: "SESSION_HEADER_MISSING",
+    });
+  });
+
+  it("accepts a cookie-only exchange without exposing a fallback token", async () => {
+    const profile = {
+      id: "11111111-1111-1111-1111-111111111111",
+      telegram_id: 1,
+      first_name: "Test",
+      created_at: "2026-07-24T00:00:00Z",
+      updated_at: "2026-07-24T00:00:00Z",
+    };
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(profile), { status: 200 }),
+    );
+
+    const exchange = await exchangeTelegramSession("signed-init-data");
+
+    expect(exchange.sessionToken).toBeNull();
+    const headers = new Headers(fetchSpy.mock.calls[0][1]?.headers);
+    expect(headers.has("X-Pepe-Session-Fallback")).toBe(false);
   });
 
   it("preserves status when an error body is empty or non-JSON", async () => {

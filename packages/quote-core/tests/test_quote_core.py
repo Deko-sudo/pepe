@@ -35,7 +35,10 @@ async def test_fake_provider_returns_a_valid_deterministic_quote() -> None:
 
     assert len(quote) == 1
     result = quote[0]
-    assert result.price == Decimal("60000.00")
+    assert Decimal("59000") < result.price < Decimal("61000")
+    assert result.bid is None
+    assert result.ask is None
+    assert result.mid is None
     assert result.instrument_id == instrument_id
     assert result.observed_at == now
     assert result.provider_timestamp == now
@@ -43,6 +46,29 @@ async def test_fake_provider_returns_a_valid_deterministic_quote() -> None:
     assert result.price_type is PriceType.LAST_TRADE
     assert result.market_status is MarketStatus.OPEN
     assert result.data_status is DataStatus.FRESH
-    assert result.delay_class is DelayClass.REALTIME
+    assert result.delay_class is DelayClass.INDICATIVE
     assert result.source_label == "Synthetic test source"
     assert result.provenance.source_label == "Synthetic test source"
+
+
+async def test_fake_quote_changes_by_minute_but_is_reproducible() -> None:
+    instrument_id = uuid.UUID("a6d8c260-3f98-4d19-9e87-8dd33413b401")
+    mapping_id = uuid.UUID("4e204e08-1f55-4dc7-a8d2-a4f36b29ea49")
+    current_time = datetime(2026, 7, 25, 12, tzinfo=UTC)
+    provider = FakeQuoteProvider(clock=lambda: current_time)
+    request = QuoteRequest(
+        instrument_id=instrument_id,
+        instrument_slug="btc-usdt",
+        provider_key="fake",
+        provider_mapping_id=mapping_id,
+        provider_instrument_id="test-btc-usdt",
+        mapping_version=1,
+    )
+
+    first = (await provider.fetch_quotes([request]))[0]
+    repeated = (await provider.fetch_quotes([request]))[0]
+    current_time = datetime(2026, 7, 25, 12, 1, tzinfo=UTC)
+    next_minute = (await provider.fetch_quotes([request]))[0]
+
+    assert first.price == repeated.price
+    assert next_minute.price != first.price

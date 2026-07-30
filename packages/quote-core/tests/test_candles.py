@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from itertools import pairwise
 
 import pytest
 
@@ -122,6 +123,55 @@ async def test_fake_historical_provider_returns_closed_candles_with_own_price_ma
         datetime(2026, 7, 25, 11, tzinfo=UTC),
     ]
     assert candles[0].instrument_id == request.instrument_id
-    assert candles[0].open == Decimal("59996.00")
+    assert candles[0].open > Decimal("59000")
+    assert candles[0].open < Decimal("61000")
     assert candles[0].close_time == candles[0].open_time + timedelta(hours=1)
     assert candles[0].received_at == now
+
+
+async def test_fake_historical_provider_is_bounded_reproducible_and_not_a_sawtooth() -> None:
+    now = datetime(2026, 7, 25, 13, tzinfo=UTC)
+    request = CandleRequest(
+        instrument_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+        instrument_slug="btc-usdt",
+        timeframe=CandleTimeframe.ONE_HOUR,
+        from_time=datetime(2026, 7, 20, tzinfo=UTC),
+        to_time=datetime(2026, 7, 25, 12, tzinfo=UTC),
+    )
+    provider = FakeHistoricalCandleProvider(clock=lambda: now)
+
+    first = await provider.fetch_candles(request)
+    second = await provider.fetch_candles(request)
+    closes = [candle.close for candle in first]
+    directions = [
+        (right > left) - (right < left)
+        for left, right in pairwise(closes)
+    ]
+
+    assert first == second
+    assert all(Decimal("59000") < close < Decimal("61000") for close in closes)
+    assert all(candle.low <= min(candle.open, candle.close) for candle in first)
+    assert all(candle.high >= max(candle.open, candle.close) for candle in first)
+    assert all(left.close == right.open for left, right in pairwise(first))
+    assert any(left == right != 0 for left, right in pairwise(directions))
+
+
+async def test_fake_historical_provider_matches_across_overlapping_pages() -> None:
+    now = datetime(2026, 7, 25, 13, tzinfo=UTC)
+    provider = FakeHistoricalCandleProvider(clock=lambda: now)
+    first = await provider.fetch_candles(CandleRequest(
+        instrument_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+        instrument_slug="eth-usdt",
+        timeframe=CandleTimeframe.FIVE_MINUTES,
+        from_time=datetime(2026, 7, 25, 10, tzinfo=UTC),
+        to_time=datetime(2026, 7, 25, 11, tzinfo=UTC),
+    ))
+    second = await provider.fetch_candles(CandleRequest(
+        instrument_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+        instrument_slug="eth-usdt",
+        timeframe=CandleTimeframe.FIVE_MINUTES,
+        from_time=datetime(2026, 7, 25, 11, tzinfo=UTC),
+        to_time=datetime(2026, 7, 25, 12, tzinfo=UTC),
+    ))
+
+    assert first[-1] == second[0]

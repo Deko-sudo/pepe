@@ -60,3 +60,24 @@ def test_token_not_in_logs(caplog: pytest.LogCaptureFixture) -> None:
     settings = BotSettings()
     token = settings.telegram_bot_token
     assert token == "" or "TELEGRAM_BOT_TOKEN" not in caplog.text
+
+
+def test_versioned_mini_app_url_uses_deterministic_build_identifier() -> None:
+    from app.main import versioned_mini_app_url
+
+    assert (
+        versioned_mini_app_url("https://mini.example/app?mode=compact", "5d181d1a")
+        == "https://mini.example/app?mode=compact&v=5d181d1a"
+    )
+
+
+def test_versioned_mini_app_url_replaces_version_and_preserves_fragment() -> None:
+    from app.main import versioned_mini_app_url
+
+    assert (
+        versioned_mini_app_url(
+            "https://mini.example/app?mode=compact&v=old#market",
+            "1a179820",
+        )
+        == "https://mini.example/app?mode=compact&v=1a179820#market"
+    )

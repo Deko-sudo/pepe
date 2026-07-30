@@ -1,8 +1,11 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 
-import { ApiError, getCurrentUser } from "../src/shared/api";
-import { TelegramProvider } from "../src/shared/telegram/provider";
+import { ApiError, clearSessionToken, getCurrentUser } from "../src/shared/api";
+import {
+  TELEGRAM_INIT_TIMEOUT_MS,
+  TelegramProvider,
+} from "../src/shared/telegram/provider";
 import { useTelegramAuth } from "../src/shared/telegram/context";
 
 function installMockWebApp(initData: string) {
@@ -48,12 +51,15 @@ const profile = {
 };
 
 afterEach(() => {
+  clearSessionToken();
   delete (window as Record<string, unknown>).Telegram;
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 describe("Telegram session bootstrap", () => {
   it("keeps browser mode after a 401 session check with no initData", async () => {
+    vi.useFakeTimers();
     installMockWebApp("");
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")
@@ -61,7 +67,10 @@ describe("Telegram session bootstrap", () => {
 
     renderProvider();
 
-    await waitFor(() => expect(screen.getByTestId("state")).toHaveTextContent("browser"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(TELEGRAM_INIT_TIMEOUT_MS);
+    });
+    expect(screen.getByTestId("state")).toHaveTextContent("browser");
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
@@ -69,6 +78,12 @@ describe("Telegram session bootstrap", () => {
     installMockWebApp("signed-init-data");
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(profile), {
+          status: 200,
+          headers: { "X-Pepe-Session-Token": "desktop-session-token" },
+        }),
+      )
       .mockResolvedValueOnce(new Response(JSON.stringify(profile), { status: 200 }));
 
     renderProvider();
@@ -92,6 +107,12 @@ describe("Telegram session bootstrap", () => {
     installMockWebApp("query_id=123&hash=abc");
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(profile), {
+          status: 200,
+          headers: { "X-Pepe-Session-Token": "desktop-session-token" },
+        }),
+      )
       .mockResolvedValueOnce(new Response(JSON.stringify(profile), { status: 200 }));
 
     renderProvider();

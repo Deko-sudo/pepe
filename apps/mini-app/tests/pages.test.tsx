@@ -1,16 +1,21 @@
-import { describe, it, expect } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
-import { Providers } from "../src/app/providers";
 import { Markets } from "../src/pages/markets";
 import { Reports } from "../src/pages/reports";
 import { Settings } from "../src/pages/settings";
 
+vi.mock("../src/shared/telegram", () => ({
+  useTelegramAuth: () => ({ state: "valid" }),
+}));
+
 function renderWithRouter(ui: React.ReactNode) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <Providers>
+    <QueryClientProvider client={queryClient}>
       <BrowserRouter>{ui}</BrowserRouter>
-    </Providers>,
+    </QueryClientProvider>,
   );
 }
 

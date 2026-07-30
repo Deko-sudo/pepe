@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.csrf import require_configured_session_csrf
-from app.api.dependencies.session import require_current_session
+from app.api.dependencies.session import get_presented_session_token, require_current_session
 from app.core.config import settings
 from app.db.session import get_db
 from app.modules.sessions.cookies import clear_session_cookie, set_session_cookie
@@ -17,8 +17,13 @@ from app.modules.sessions.service import (
     revoke_presented_session,
     utc_now,
 )
+from app.modules.sessions.transport import SESSION_FALLBACK_HEADER, session_fallback_requested
 from app.modules.users.service import get_user_by_telegram_id, upsert_telegram_user
-from app.schemas.auth import TelegramValidateRequest, TelegramValidateResponse, UserProfile
+from app.schemas.auth import (
+    TelegramValidateRequest,
+    TelegramValidateResponse,
+    UserProfile,
+)
 from app.services.telegram_init_data import TelegramInitDataError, validate_telegram_init_data
 
 router = APIRouter()
@@ -60,7 +65,20 @@ async def validate_telegram_init_data_endpoint(
     return validation
 
 
-@router.post("/auth/telegram/session", response_model=UserProfile)
+@router.post(
+    "/auth/telegram/session",
+    response_model=UserProfile,
+    responses={
+        200: {
+            "headers": {
+                SESSION_FALLBACK_HEADER: {
+                    "description": ("Conditional in-memory session fallback for Telegram Desktop."),
+                    "schema": {"type": "string"},
+                },
+            },
+        },
+    },
+)
 async def exchange_telegram_session(
     body: TelegramValidateRequest,
     request: Request,
@@ -74,7 +92,7 @@ async def exchange_telegram_session(
     now = utc_now()
     await revoke_presented_session(
         db,
-        request.cookies.get(settings.session_cookie_name),
+        get_presented_session_token(request),
         now=now,
     )
     session, token = await create_session(
@@ -86,7 +104,11 @@ async def exchange_telegram_session(
         now=now,
     )
     set_session_cookie(response, token=token, expires_at=session.expires_at)
-    return UserProfile.model_validate(user)
+    if session_fallback_requested(request.headers):
+        response.headers[SESSION_FALLBACK_HEADER] = token
+    response.headers["Cache-Control"] = "no-store"
+    profile = UserProfile.model_validate(user)
+    return profile
 
 
 @router.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -98,7 +120,7 @@ async def logout(
 ) -> None:
     await revoke_presented_session(
         db,
-        request.cookies.get(settings.session_cookie_name),
+        get_presented_session_token(request),
         now=utc_now(),
     )
     clear_session_cookie(response)

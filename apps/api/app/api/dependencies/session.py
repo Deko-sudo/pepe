@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request
@@ -14,17 +15,45 @@ from app.modules.sessions.service import (
 )
 
 AUTH_ERROR = "Unauthorized."
+logger = logging.getLogger(__name__)
+
+
+def _get_presented_session(request: Request) -> tuple[str | None, str]:
+    authorization = request.headers.get("authorization", "")
+    scheme, separator, token = authorization.partition(" ")
+    if (
+        separator
+        and scheme.casefold() == "bearer"
+        and token
+        and not any(character.isspace() for character in token)
+    ):
+        return token, "bearer"
+    cookie_token = request.cookies.get(settings.session_cookie_name)
+    return cookie_token, "cookie" if cookie_token else "none"
+
+
+def get_presented_session_token(request: Request) -> str | None:
+    return _get_presented_session(request)[0]
 
 
 async def require_current_session(
     request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> AuthenticatedSession:
+    token, source = _get_presented_session(request)
     auth = await resolve_authenticated_session(
         db,
-        request.cookies.get(settings.session_cookie_name),
+        token,
         idle_ttl_seconds=settings.session_idle_ttl_seconds,
         now=utc_now(),
+    )
+    logger.debug(
+        "session_authentication source=%s authorization_header_present=%s "
+        "cookie_present=%s recognized=%s",
+        source,
+        bool(request.headers.get("authorization")),
+        settings.session_cookie_name in request.cookies,
+        auth is not None,
     )
     if auth is None:
         raise HTTPException(status_code=401, detail=AUTH_ERROR)

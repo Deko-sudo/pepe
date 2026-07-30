@@ -6,9 +6,12 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from fastapi import HTTPException
 from starlette.requests import Request
+from starlette.responses import Response
 
 from app.api.dependencies.csrf import _origin_from_url, require_session_csrf
+from app.api.dependencies.session import get_presented_session_token
 from app.core.config import Settings
+from app.modules.sessions import cookies as session_cookies
 from app.modules.sessions.service import (
     SESSION_TOKEN_BYTES,
     clamp_idle_expiry,
@@ -41,6 +44,29 @@ def test_session_token_digest_is_sha256_hex_without_returning_raw_token() -> Non
     assert digest == hashlib.sha256(token.encode("utf-8")).hexdigest()
     assert len(digest) == 64
     assert token not in digest
+
+
+def test_bearer_session_token_takes_precedence_over_cookie() -> None:
+    request = make_request(
+        {
+            "authorization": "Bearer desktop-session-token",
+            "cookie": "pepe_session=cookie-session-token",
+        },
+    )
+
+    assert get_presented_session_token(request) == "desktop-session-token"
+
+
+@pytest.mark.parametrize("authorization", ["", "Basic token", "Bearer", "Bearer one two"])
+def test_invalid_authorization_falls_back_to_cookie(authorization: str) -> None:
+    request = make_request(
+        {
+            "authorization": authorization,
+            "cookie": "pepe_session=cookie-session-token",
+        },
+    )
+
+    assert get_presented_session_token(request) == "cookie-session-token"
 
 
 def test_sliding_idle_expiry_never_crosses_absolute_expiry() -> None:
@@ -117,6 +143,52 @@ def test_settings_accepts_insecure_development_environment() -> None:
     settings = Settings(environment="development", session_cookie_secure=False)
 
     assert settings.environment == "development"
+
+
+def test_settings_rejects_cross_site_cookie_without_secure_transport() -> None:
+    with pytest.raises(ValueError, match="session_cookie_secure"):
+        Settings(session_cookie_same_site="none", session_cookie_secure=False)
+
+
+def test_settings_rejects_partitioned_cookie_without_cross_site_policy() -> None:
+    with pytest.raises(ValueError, match="session_cookie_same_site"):
+        Settings(session_cookie_partitioned=True, session_cookie_secure=True)
+
+
+def test_session_cookie_supports_cross_site_telegram_desktop(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("app.modules.sessions.cookies.settings.session_cookie_same_site", "none")
+    monkeypatch.setattr("app.modules.sessions.cookies.settings.session_cookie_secure", True)
+    monkeypatch.setattr("app.modules.sessions.cookies.settings.session_cookie_partitioned", True)
+    response = Response()
+
+    session_cookies.set_session_cookie(
+        response,
+        token=generate_session_token(),
+        expires_at=datetime(2026, 8, 27, tzinfo=UTC),
+    )
+
+    cookie = response.headers["set-cookie"]
+    assert "HttpOnly" in cookie
+    assert "Secure" in cookie
+    assert "SameSite=none" in cookie
+    assert "Partitioned" in cookie
+
+
+def test_clearing_session_cookie_preserves_partitioned_scope(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("app.modules.sessions.cookies.settings.session_cookie_same_site", "none")
+    monkeypatch.setattr("app.modules.sessions.cookies.settings.session_cookie_secure", True)
+    monkeypatch.setattr("app.modules.sessions.cookies.settings.session_cookie_partitioned", True)
+    response = Response()
+
+    session_cookies.clear_session_cookie(response)
+
+    cookie = response.headers["set-cookie"]
+    assert "Max-Age=0" in cookie
+    assert "Partitioned" in cookie
 
 
 def test_settings_rejects_session_origin_missing_from_cors_origins() -> None:

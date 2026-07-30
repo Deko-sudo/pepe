@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 from typing import Any, cast
@@ -51,6 +51,7 @@ def make_response(**overrides: object) -> CurrentQuoteResponse:
         "delay_class": DelayClass.REALTIME,
         "source_label": "Synthetic test source",
         "venue_label": "Synthetic test venue",
+        "stale_after_seconds": 60,
     }
     values.update(overrides)
     return CurrentQuoteResponse.from_values(**values)  # type: ignore[arg-type]
@@ -155,7 +156,10 @@ async def test_cache_restores_a_shared_codec_v1_payload_with_nested_provenance()
 
     restored = await cache.get(INSTRUMENT_ID)
 
-    assert restored == response
+    # The cache codec intentionally does not persist stale_after_seconds; it is
+    # recomputed from the asset class by _apply_freshness on every cache read
+    # in the service layer. Compare against the cache-equivalent response.
+    assert restored == make_response(stale_after_seconds=0)
     assert redis.calls == [("get", cache._key(INSTRUMENT_ID))]
     assert restored.provenance.model_dump(mode="json") == {
         "source_label": "Synthetic test source", "venue_label": "Synthetic test venue",
@@ -273,3 +277,68 @@ async def test_service_invalid_cache_payload_falls_back_to_durable_quote(kind: s
     assert len(db.calls) == 2
     assert redis.calls[0][0] == "get"
     assert redis.calls[1][0] == "set"
+
+
+def _make_instrument_with_class(asset_class: str, slug: str = "xau-usd") -> SimpleNamespace:
+    return SimpleNamespace(id=INSTRUMENT_ID, slug=slug, asset_class=asset_class)
+
+
+def test_crypto_quote_exposes_the_configured_crypto_stale_threshold() -> None:
+    from app.modules.market_data.quotes import _response_from_quote
+
+    instrument = _make_instrument_with_class("crypto_spot", "btc-usdt")
+    response = _response_from_quote(
+        cast(Any, instrument), cast(Any, make_durable_quote()), NOW,
+    )
+
+    assert response is not None
+    assert response.stale_after_seconds == 60
+
+
+def test_reference_quote_exposes_the_configured_reference_stale_threshold() -> None:
+    from app.modules.market_data.quotes import _response_from_quote
+
+    instrument = _make_instrument_with_class("metal_fx_spot", "xau-usd")
+    response = _response_from_quote(
+        cast(Any, instrument), cast(Any, make_durable_quote()), NOW,
+    )
+
+    assert response is not None
+    assert response.stale_after_seconds == 300
+
+
+def test_reference_quote_stays_fresh_between_crypto_and_reference_thresholds() -> None:
+    from app.modules.market_data.quotes import _apply_freshness
+
+    instrument = _make_instrument_with_class("metal_fx_spot", "xau-usd")
+    response = _response_from_quote_fresh(instrument)
+    later = NOW + timedelta(seconds=90)
+    result = _apply_freshness(response, instrument.asset_class, later)
+
+    assert result is not None
+    assert result.data_status == DataStatus.FRESH
+    assert result.stale_after_seconds == 300
+
+
+def test_reference_quote_becomes_stale_at_reference_threshold() -> None:
+    from app.modules.market_data.quotes import _apply_freshness
+
+    instrument = _make_instrument_with_class("metal_fx_spot", "xau-usd")
+    response = _response_from_quote_fresh(instrument)
+    later = NOW + timedelta(seconds=300)
+    result = _apply_freshness(response, instrument.asset_class, later)
+
+    assert result is not None
+    assert result.data_status == DataStatus.STALE
+
+
+def _response_from_quote_fresh(instrument: SimpleNamespace) -> CurrentQuoteResponse:
+    from app.modules.market_data.quotes import _response_from_quote
+
+    response = _response_from_quote(
+        cast(Any, instrument), cast(Any, make_durable_quote()), NOW,
+    )
+    assert response is not None
+    return response
+    assert response is not None
+    return response

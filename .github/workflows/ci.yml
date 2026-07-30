@@ -273,7 +273,7 @@ jobs:
         run: |
           set -euo pipefail
           docker compose down --remove-orphans
-          docker compose build
+          MINI_APP_BUILD_ID="$(git rev-parse --short=8 HEAD)" docker compose build
           docker compose up -d api
 
           for attempt in $(seq 1 30); do

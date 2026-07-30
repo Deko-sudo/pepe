@@ -11,7 +11,7 @@ vi.mock("../src/shared/api/market", async (importOriginal) => ({
 vi.mock("../src/shared/telegram", () => ({ useTelegramAuth: () => ({ state: "valid" }) }));
 
 const asset = { id: "00000000-0000-4000-8000-000000000001", slug: "btc-usdt", symbol: "BTC/USDT", display_name: "Bitcoin", asset_class: "crypto", market_type: "spot", base_asset: "BTC", quote_asset: "USDT", price_precision: 2, quantity_precision: 8, timezone: "UTC", calendar_kind: "continuous", trading_calendar: "24x7", metadata_version: 1, is_enabled: true };
-const quote = { slug: "btc-usdt", price: "12345678901234567890.123456789", bid: null, ask: null, mid: null, market_status: "open", data_status: "fresh", observed_at: "2026-01-01T00:00:00Z", received_at: "2026-01-01T00:00:00Z", age_seconds: 1, provenance: { source_label: "fixture", venue_label: null, market_type: "spot", price_type: "last", delay_class: "realtime" } };
+const quote = { slug: "btc-usdt", price: "12345678901234567890.123456789", bid: null, ask: null, mid: null, market_status: "open", data_status: "fresh", observed_at: "2026-01-01T00:00:00Z", received_at: "2026-01-01T00:00:00Z", age_seconds: 1, stale_after_seconds: 60, provenance: { source_label: "fixture", venue_label: null, market_type: "spot", price_type: "last", delay_class: "realtime" } };
 const candle = { open_time: "2026-01-01T00:00:00Z", close_time: "2026-01-01T00:01:00Z", open: "1.000000000001", high: "3.000000000001", low: "0.500000000001", close: "2.000000000001", source_label: "fixture", venue_label: null, received_at: "2026-01-01T00:01:00Z" };
 
 function renderMarkets() { return render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Markets /></QueryClientProvider>); }

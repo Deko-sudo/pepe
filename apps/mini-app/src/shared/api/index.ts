@@ -6,6 +6,7 @@ export {
   logoutAll,
   validateTelegramInitData,
 } from "./client";
+export { activateSessionToken, clearSessionToken } from "./session-token";
 export type {
   TelegramUser,
   TelegramValidateResponse,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Callable, Iterable
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -15,6 +16,40 @@ from .types import (
     PriceType,
     QuoteRequest,
 )
+
+_PRICE_QUANTUM = Decimal("0.01")
+_ANCHOR_WIDTH = 8
+
+
+def _stable_sample(*parts: object, modulus: int) -> int:
+    payload = ":".join(str(part) for part in parts).encode("utf-8")
+    digest = hashlib.blake2b(payload, digest_size=8, person=b"pepe-demo").digest()
+    return int.from_bytes(digest, "big") % modulus
+
+
+def _synthetic_price(
+    base_price: Decimal,
+    *,
+    instrument_slug: str,
+    timeframe: str,
+    candle_index: int,
+) -> Decimal:
+    """Return one request-independent point on a bounded deterministic demo path."""
+    anchor_index, position = divmod(candle_index, _ANCHOR_WIDTH)
+    left = _stable_sample(instrument_slug, timeframe, anchor_index, modulus=801) - 400
+    right = _stable_sample(instrument_slug, timeframe, anchor_index + 1, modulus=801) - 400
+    interpolated = Decimal(left * (_ANCHOR_WIDTH - position) + right * position) / Decimal(
+        _ANCHOR_WIDTH,
+    )
+    micro_movement = _stable_sample(
+        instrument_slug,
+        timeframe,
+        candle_index,
+        "micro",
+        modulus=17,
+    ) - 8
+    relative_offset = (interpolated + Decimal(micro_movement)) / Decimal("100000")
+    return (base_price * (Decimal(1) + relative_offset)).quantize(_PRICE_QUANTUM)
 
 
 class QuoteProvider(Protocol):
@@ -44,11 +79,15 @@ class FakeQuoteProvider:
 
     def _quote_for(self, request: QuoteRequest, now: datetime) -> NormalizedQuote:
         try:
-            price = self._PRICES[request.instrument_slug]
+            base_price = self._PRICES[request.instrument_slug]
         except KeyError as error:
             raise ValueError("unsupported fake instrument") from error
-        bid = price - Decimal("0.50")
-        ask = price + Decimal("0.50")
+        price = _synthetic_price(
+            base_price,
+            instrument_slug=request.instrument_slug,
+            timeframe="1m",
+            candle_index=int(now.timestamp() // 60),
+        )
         return NormalizedQuote(
             instrument_id=request.instrument_id,
             instrument_slug=request.instrument_slug,
@@ -60,9 +99,9 @@ class FakeQuoteProvider:
             market_type=MarketType.SPOT,
             price_type=PriceType.LAST_TRADE,
             price=price,
-            bid=bid,
-            ask=ask,
-            mid=(bid + ask) / Decimal("2"),
+            bid=None,
+            ask=None,
+            mid=None,
             open_24h=None,
             high_24h=None,
             low_24h=None,
@@ -76,7 +115,7 @@ class FakeQuoteProvider:
             data_delay_seconds=0,
             market_status=MarketStatus.OPEN,
             data_status=DataStatus.FRESH,
-            delay_class=DelayClass.REALTIME,
+            delay_class=DelayClass.INDICATIVE,
             stale_after_seconds=60,
             hard_expire_after_seconds=300,
             mapping_version=request.mapping_version,
@@ -112,10 +151,31 @@ class FakeHistoricalCandleProvider:
         duration = timeframe_duration(request.timeframe)
         candles: list[NormalizedCandle] = []
         open_time = request.from_time
+        timeframe_seconds = int(duration.total_seconds())
         while open_time <= request.to_time:
-            offset = Decimal(int(open_time.timestamp() // duration.total_seconds()) % 11 - 5)
-            opening = price + offset
-            closing = opening + Decimal("0.25")
+            candle_index = int(open_time.timestamp() // timeframe_seconds)
+            opening = _synthetic_price(
+                price,
+                instrument_slug=request.instrument_slug,
+                timeframe=request.timeframe.value,
+                candle_index=candle_index - 1,
+            )
+            closing = _synthetic_price(
+                price,
+                instrument_slug=request.instrument_slug,
+                timeframe=request.timeframe.value,
+                candle_index=candle_index,
+            )
+            wick_units = Decimal(
+                4 + _stable_sample(
+                    request.instrument_slug,
+                    request.timeframe.value,
+                    candle_index,
+                    "wick",
+                    modulus=15,
+                ),
+            )
+            wick = (price * wick_units / Decimal("200000")).quantize(_PRICE_QUANTUM)
             candles.append(
                 NormalizedCandle(
                     instrument_id=request.instrument_id,
@@ -123,8 +183,8 @@ class FakeHistoricalCandleProvider:
                     open_time=open_time,
                     close_time=open_time + duration,
                     open=opening,
-                    high=closing + Decimal("0.25"),
-                    low=opening - Decimal("0.25"),
+                    high=max(opening, closing) + wick,
+                    low=min(opening, closing) - wick,
                     close=closing,
                     base_volume=Decimal("1"),
                     quote_volume=closing,
