@@ -30,10 +30,12 @@ No live provider is wired into the data path. Provider selection is gated by
 `ProviderCapabilities` protocols in `apps/api/app/modules/market_data/providers.py`
 exist as the intended adapter boundary but are not yet exercised.
 
-**Config gates (enforce synthetic-only in production):**
-- `quote_fake_provider_enabled` defaults `false`; raises `ValueError` if `true` in production.
-- `candle_fake_provider_enabled` defaults `false`.
-- `quote_source_label` / `quote_venue_label` must not be synthetic placeholders in production.
+**Production-safety finding (not yet remediated):** `docker-compose.yml` defaults both
+`QUOTE_FAKE_PROVIDER_ENABLED` and `CANDLE_FAKE_PROVIDER_ENABLED` to `true`. The worker
+configuration has no environment-aware fail-closed validation, and DEMO labeling does not
+prevent synthetic values from being persisted. A live launch MUST add explicit production
+validation, and synthetic and live providers MUST NOT run concurrently except in a separately
+approved migration mode. This is a launch prerequisite, not an existing safeguard.
 
 ---
 
@@ -58,11 +60,11 @@ exist as the intended adapter boundary but are not yet exercised.
 - Deterministic identity: `(instrument_id, timeframe, open_time)`.
 - PostgreSQL is the source of truth (table `market_candles`, unique constraint `uq_market_candles_identity`).
 - Idempotent upsert via `ON CONFLICT (instrument_id, timeframe, open_time) DO UPDATE`.
-- Candle sync service pages at 500 candles per request; rejects gaps, duplicates, and out-of-range bars.
+- Candle sync service pages logically at 500 candles per request; rejects gaps, duplicates, and out-of-range bars.
 
 ### Quote contract
 
-- `NormalizedQuote` (32 fields): price, bid/ask/mid, 24h OHLC/change, provenance, UTC timestamps, freshness policy.
+- `NormalizedQuote` (32 fields): price, optional bid/ask/mid, 24h OHLC/change, provenance, UTC timestamps, freshness policy.
 - Latest-quote persistence: `latest_market_quotes` table, one row per instrument, idempotent upsert with deterministic latest-quote ordering.
 - Freshness: crypto stale after 60s / hard-expire 300s; reference (XAU) stale after 300s / hard-expire 900s.
 - Redis cache (best-effort, TTL 60s) sits in front of the DB.
@@ -83,7 +85,10 @@ async def fetch_quotes(
 ```
 
 - Return exactly one `NormalizedQuote` per `QuoteRequest`, with matching `instrument_id`.
-- All 32 `NormalizedQuote` fields populated and validated (positive prices, `bid ≤ ask`, `mid = (bid+ask)/2`, UTC timestamps, `stale_after_seconds > 0`, `hard_expire > stale_after`, deterministic `provider_event_id`).
+- Required: last price and UTC timestamps. Bid and ask MAY be null when the provider does not
+  supply them; `mid` MAY be derived only when both bid and ask exist. The adapter MUST NOT
+  fabricate bid, ask, mid, or spread. When values exist, validation enforces positive prices,
+  `bid ≤ ask`, and `mid = (bid+ask)/2`; freshness and deterministic event-ID validation remain required.
 - Failures: raise an exception (caught → `PROVIDER_FAILED` retryable → Celery backoff).
 
 ### HistoricalCandleProvider
@@ -92,7 +97,7 @@ async def fetch_quotes(
 async def fetch_candles(self, request: CandleRequest) -> tuple[NormalizedCandle, ...]
 ```
 
-- Return contiguous closed candles covering `[from_time, to_time]` inclusive (both aligned to timeframe boundary).
+- Return closed candles for expected open-session bars in `[from_time, to_time]` (aligned to timeframe boundaries).
 - `NormalizedCandle`: OHLC, optional base/quote volume, trade count, provenance labels, UTC timestamps.
 - Service pages at 500 candles; validates alignment, contiguity, no gaps/duplicates.
 
@@ -103,10 +108,14 @@ Replace `FakeQuoteProvider` / `FakeHistoricalCandleProvider` instantiation in
 `provider_instrument_mappings` and change the SQL filter from `provider_key='fake'`
 to the live provider key.
 
-### No interface change required
+### Required runtime-design prerequisites
 
-The existing `QuoteProvider` / `HistoricalCandleProvider` protocols are sufficient
-for a live adapter. No interface extension is needed.
+The protocol shapes may be reusable, but the current runtime is not sufficient for live XAU/USD:
+it assumes fixed-duration contiguity across requested bounds. Before XAU integration, expected-bar
+generation and gap detection MUST be session-aware: no gap during known closures, strict gaps during
+open sessions, a normalized/provider-specific calendar with weekends, holidays and DST, and an explicit
+daily-boundary policy. BTC/USDT and ETH/USDT MUST retain strict 24×7 contiguity. This requires runtime
+design and tests; it is not implemented by this PR.
 
 ---
 
@@ -116,7 +125,7 @@ for a live adapter. No interface extension is needed.
 |----------|----------|-------------|--------|
 | Marketstack | Unified | **YES** | Equities/stocks only — no crypto, no forex, no XAU/USD. |
 | Coinbase | Crypto | **YES** | Does not support USDT quote currency (uses USD/USDC). `BTC-USDC` ≠ `BTC/USDT`. |
-| CoinGecko | Crypto aggregator | **YES** | No native 1m/5m/15m OHLCV (auto-granularity ≥ 30min; minute-grain is Enterprise-only). Cannot meet candle contract. |
+| CoinGecko | Crypto aggregator | **YES** | No native 1m/5m/15m OHLCV (auto-granularity ≥ 30min; minute-level access is Enterprise-only). Cannot meet candle contract. |
 | CryptoCompare / CoinDesk | Crypto aggregator | **YES** | Free tier retired 2026-05-21; paid-only with unknown pricing. Key-gated endpoints prevent verification. |
 | MetalpriceAPI | Metals | **YES** | No documented intraday OHLC. Likely daily-only time-series. Insufficient for candle contract. |
 | Metals-API | Metals | **YES** | OHLC endpoint is daily-only (UTC-day open/close). No native intraday candles (1m/5m/15m/1h/4h). |
@@ -158,7 +167,7 @@ for a live adapter. No interface extension is needed.
 | Bid/Ask | ✅ | ✅ | ✅ |
 | WebSocket | ✅ | ✅ | ✅ (v2) |
 | Rate limit | 1,200 weight/min (IP-based) | 600 req/5s (IP-based) | ~1 req/s safe (call counter) |
-| Geographic restrictions | **US prohibited** (Binance.com) | UNVERIFIED | UNVERIFIED |
+| Geographic restrictions | **US prohibited** (Binance.com) | **US prohibited** | UNVERIFIED |
 | Cost | Free | Free | Free |
 
 ### Gold/metals candidates (for split architecture — XAU/USD only)
@@ -183,8 +192,11 @@ for a live adapter. No interface extension is needed.
 | Twelve Data XAU/USD | https://twelvedata.com/markets/300755/commodity/xau-usd |
 | Twelve Data time-series docs | https://twelvedata.com/docs |
 | Twelve Data terms | https://twelvedata.com/terms |
+| Twelve Data quote schema | https://twelvedata.com/docs/llms/market-data/quote.md |
 | Binance API spec | https://raw.githubusercontent.com/binance/binance-spot-api-docs/master/rest-api.md |
 | Bybit V5 docs | https://bybit-exchange.github.io/docs/v5/ |
+| Bybit restricted countries | https://www.bybit.com/en/help-center/article/Service-Restricted-Countries |
+| Binance terms / restricted jurisdictions | https://www.binance.com/en/terms |
 | Kraken docs | https://docs.kraken.com/ |
 | Kraken llms index | https://docs.kraken.com/llms.txt |
 | Finnhub pricing | https://finnhub.io/pricing |
@@ -225,17 +237,17 @@ Based on the actual Pepe scheduler design:
 
 ### Cold-start backfill (one-time)
 
-| Profile | Pages (bootstrap windows: 1m=24h, 5m=7d, 15m=30d, 1h=180d, 4h=365d, 1d=5y) |
-|---------|------|
-| A / B (3 instruments) | 96 pages |
-| C (10 instruments) | 320 pages |
+Logical pages use `ceil(candle_count / 500)`: 1m 1,440→3; 5m 2,016→5;
+15m 2,880→6; 1h 4,320→9; 4h 2,190→5; 1d approximately 1,825→4.
+That is approximately **32 logical pages/instrument**, **96 for 3**, and **320 for 10**.
+An HTTP provider with a smaller page limit requires more HTTP calls; XAU/USD also has fewer
+expected open-session bars than the 24×7 planning upper bound.
 
 ### 24-hour outage recovery
 
-| Profile | Pages (24h of all TFs) |
-|---------|----------------------|
-| A / B (3 instruments) | 24 |
-| C (10 instruments) | 80 |
+Logical pages: 1m 1,440→3; 5m 288→1; 15m 96→1; 1h 24→1; 4h 6→1;
+1d at most one relevant bar→1. That is approximately **8 logical pages/instrument**,
+**24 for 3**, and **80 for 10**, subject to XAU/USD sessions and provider page limits.
 
 ---
 
@@ -250,7 +262,7 @@ Based on the actual Pepe scheduler design:
 | Binance + Twelve Data (split) | Binance free + Twelve Data Grow | $29 | ✅ best value |
 | Alpha Vantage | Free (25 req/day) | $0 | ❌ far too low |
 | Alpha Vantage | 75 req/min | $49.99 | ✅ |
-| Finnhub | Free (60 req/min) | $0 | ⚠️ forex OHLC is premium — XAU needs paid |
+| Finnhub | Free (60 req/min) | $0 | ⚠️ forex OHLC is premium — XAU requires a paid plan |
 | Tiingo | Power | $10 | ❓ UNVERIFIED XAU intraday |
 
 ### Profile B — Initial Launch (3 instruments, 24×7)
@@ -400,6 +412,12 @@ Each criterion scored 0–5. Weighted score = Σ(score × weight).
 
 ### Scoring results
 
+Weights sum to 100. Totals are reproduced as `Σ(score × weight) / 100` using the table rows:
+Twelve Data `(5×15+5×12+5×10+4×8+5×5+4×10+4×8+3×5+5×5+4×7+3×7+3×2+4×3+4×3)/100=4.33`;
+Binance+TD `=4.52`; Alpha Vantage `=3.56`; Finnhub `=3.46`; Bybit+TD `=4.37`; Kraken+TD `=3.99`.
+The ranking is a decision aid, not a selection: hard legal, jurisdiction, session-validation and
+data-retention constraints override a numerical score.
+
 | Criterion (weight) | Twelve Data | Binance+TD | Alpha Vantage | Finnhub | Bybit+TD | Kraken+TD |
 |---------------------|:-----------:|:----------:|:------------:|:-------:|:--------:|:---------:|
 | Exact instruments (15%) | 5 | 5 | 5 | 5 | 5 | 5 |
@@ -416,7 +434,7 @@ Each criterion scored 0–5. Weighted score = Σ(score × weight).
 | Attribution (2%) | 3 | 3 | 3 | 3 | 3 | 3 |
 | Credential security (3%) | 4 | 5 | 4 | 4 | 5 | 5 |
 | Implementation complexity (3%) | 4 | 3 | 3 | 3 | 3 | 3 |
-| **Weighted total** | **4.33** | **4.54** | **3.72** | **3.58** | **4.45** | **4.14** |
+| **Weighted total** | **4.33** | **4.52** | **3.56** | **3.46** | **4.37** | **3.99** |
 
 ### Hard disqualifiers
 
@@ -425,6 +443,14 @@ Each criterion scored 0–5. Weighted score = Σ(score × weight).
 - **CryptoCompare/CoinDesk:** Free tier retired; paid-only with unverifiable pricing.
 - **Metals-API / MetalpriceAPI / GoldAPI:** No intraday candle API.
 - **Marketstack:** No crypto/forex/metals.
+
+### Corrected ranking
+
+1. Binance+Twelve Data — **4.52**, eligible only where lawful and after hard prerequisites.
+2. Bybit+Twelve Data — **4.37**, eligible only where lawful and after hard prerequisites.
+3. Twelve Data unified — **4.33**, viable only with nullable bid/ask product acceptance and terms confirmation.
+4. Kraken+Twelve Data — **3.99**, jurisdiction and terms UNVERIFIED.
+5. Alpha Vantage — **3.56**; 6. Finnhub — **3.46**.
 
 ### Unresolved unknowns
 
@@ -444,18 +470,24 @@ Each criterion scored 0–5. Weighted score = Σ(score × weight).
 
 ## 13. Recommendation (Advisory Only — NOT a Selection)
 
-### Recommended architecture: Option 2 — Split Provider (Crypto Exchange + XAU/USD Provider)
+### Advisory architecture preference: Option 2 — Split Provider (Crypto Exchange + XAU/USD Provider)
 
-**Rationale:**
+**Rationale (subject to hard preconditions and owner approval):**
 - Crypto market data from Binance/Bybit is **free, real-time, keyless**, with all 6 native intervals and 1,000 candles/request.
 - XAU/USD from Twelve Data provides **spot gold** with all 6 native intervals, 20+ years of history, and WebSocket streaming.
 - Total cost: **$29/month** (Twelve Data Grow for XAU only; crypto is free).
 - The split provides **partial outage isolation** — if the crypto exchange is down, XAU data continues, and vice versa.
 - The split architecture is more resilient and cheaper than any single-provider option for the same coverage.
 
-### Recommended primary pair: Bybit (crypto) + Twelve Data (XAU/USD)
+### Conditional provider pairs — no provider selected
 
-**Why Bybit over Binance:** Binance.com prohibits US persons. Bybit's geographic restrictions are less documented but it does not have a published US prohibition equivalent to Binance's explicit ban. **The owner must confirm the deployment jurisdiction before final selection.** If the deployment is outside the US, Binance is equally viable and has deeper liquidity/longer history.
+Binance.com and Bybit both publish United States restrictions. Neither is a jurisdiction-safe
+choice for a US-based owner or deployment. The owner MUST establish lawful deployment and owner
+jurisdiction before choosing any crypto exchange. A jurisdiction-safe alternative is **UNVERIFIED**
+until its current official restriction and data-use terms are checked; Kraken remains a candidate,
+not a recommendation. Outside excluded jurisdictions, a crypto exchange + Twelve Data XAU/USD is
+an advisory pairing only and still requires XAU session-aware validation, routing, terms confirmation,
+and explicit owner approval.
 
 ### Credible alternative: Option 1 — Twelve Data unified (single provider)
 
@@ -464,7 +496,7 @@ Each criterion scored 0–5. Weighted score = Σ(score × weight).
 ### Main risks
 
 1. **Legal/storage terms UNVERIFIED** — Twelve Data's "permitted timeframes" caching clause and all providers' PostgreSQL storage rights need vendor confirmation before committing to indefinite candle persistence.
-2. **Geographic restrictions** — Binance prohibits US access; Bybit/Kraken restrictions UNVERIFIED.
+2. **Geographic restrictions** — Binance.com and Bybit prohibit US access; Kraken eligibility is UNVERIFIED.
 3. **Series-boundary safety** — If a split architecture ever needs fallback (Option 3), two providers' candle semantics may not be safely combinable.
 4. **4h candle aggregation** — Alpha Vantage and Finnhub lack native 4h; aggregating from 1h introduces complexity and must match Pepe's `[open_time, close_time)` contract.
 
@@ -475,7 +507,7 @@ Each criterion scored 0–5. Weighted score = Σ(score × weight).
 - Worker wiring changes (replace `FakeProvider` instantiation, update SQL target filter).
 - Config additions (API keys as env vars, provider selection toggle).
 - Unit tests with mocked HTTP; integration tests against sandbox/public endpoints.
-- No interface changes required.
+- Session-aware XAU expected-bar/gap validation and split candle routing are required runtime work.
 
 ### Minimum viable paid plan
 
@@ -523,10 +555,15 @@ Each criterion scored 0–5. Weighted score = Σ(score × weight).
 1. Create `BybitAdapter` (crypto) and `TwelveDataAdapter` (XAU only).
 2. Map: Bybit `BTCUSDT`/`ETHUSDT`; Twelve Data `XAU/USD`.
 3. Alembic migration: seed mappings with `provider_key='bybit'` and `provider_key='twelvedata'`.
-4. Worker: provider routing by `provider_key`; quote refresh loads correct provider per instrument.
+4. Worker: add both quote and candle routing. Candle targets/requests need provider key and resolved
+   provider symbol (or an equivalent dispatcher); join `provider_instrument_mappings`, dispatch to a
+   registry of separate provider clients/credentials, and apply per-provider pagination, rate limits,
+   retry policy, provenance and idempotent persistence.
 5. Config: `TWELVEDATA_API_KEY` env var; Bybit is keyless.
-6. Tests: per-adapter mock tests; cross-provider provenance verification.
-7. Provenance: crypto quotes labeled "Bybit"; XAU quotes labeled "Twelve Data".
+6. Tests: per-adapter mocks; BTC/ETH routed only to the crypto provider and XAU only to the metals
+   provider; pagination/rate-limit/retry tests; provenance and safe series-boundary tests. The
+   dispatcher MUST prevent silent mixing of incompatible candle series.
+7. Provenance: crypto quotes labeled with the selected exchange; XAU quotes labeled "Twelve Data".
 
 ### No-implementation statement
 
