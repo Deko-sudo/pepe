@@ -25,10 +25,12 @@ function fetchExact(url) {
 }
 
 let currentUrl = metadata.officialUrl;
-for (let redirects = 0; redirects <= 3; redirects += 1) {
+for (let redirects = 0; ; redirects += 1) {
   const response = await fetchExact(currentUrl);
   if ([301, 302, 303, 307, 308].includes(response.statusCode)) {
-    const next = new URL(response.location ?? "", currentUrl);
+    if (redirects >= 3) throw new Error("Provider redirect limit exceeded");
+    if (!response.location) throw new Error("Provider redirect has no Location header");
+    const next = new URL(response.location, currentUrl);
     if (next.protocol !== "https:") throw new Error(`Rejected non-HTTPS redirect: ${next.href}`);
     currentUrl = next.href;
     continue;

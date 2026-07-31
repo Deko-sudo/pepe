@@ -8,8 +8,11 @@ const bootstrap = await readFile(path.join(root, "public/assets/bootstrap.js"), 
 const packageJson = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
 if (Object.keys(routes).length !== 3 || Object.keys(intervals).length !== 6) throw new Error("Canonical route set is incomplete");
 if (lifecycleEvents.includes("provider-ready")) throw new Error("Provider-ready must not exist in W2");
-for (const forbidden of ["localStorage", "sessionStorage", "document.cookie", "Authorization", "initData", "addEventListener(\"message\""]) {
-  if (bootstrap.includes(forbidden)) throw new Error(`Forbidden wrapper behavior: ${forbidden}`);
+for (const forbidden of [
+  /localStorage/, /sessionStorage/, /document\.cookie/, /Authorization/, /initData/,
+  /addEventListener\s*\(\s*["']message["']/, /\bonmessage\s*=/,
+]) {
+  if (forbidden.test(bootstrap)) throw new Error(`Forbidden wrapper behavior: ${forbidden}`);
 }
 if (Object.keys(packageJson.dependencies ?? {}).length !== 0) throw new Error("Wrapper must have zero production dependencies");
 console.log("Static security contract checks passed.");

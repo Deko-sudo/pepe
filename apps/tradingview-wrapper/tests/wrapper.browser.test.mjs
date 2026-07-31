@@ -49,7 +49,7 @@ test("query, fragment, and invalid routes do not request TradingView", async () 
     await page.route("https://s3.tradingview.com/**", (route) => { providerRequests += 1; return route.abort(); });
     await page.goto(`http://127.0.0.1:4174/?test_private_marker=must_not_reach_wrapper`);
     await page.evaluate((path) => window.wrapperHarness.mount(path), routePath);
-    await page.waitForTimeout(200);
+    await page.waitForFunction(() => window.wrapperHarness.received.includes("wrapper-configuration-invalid"));
     assert.equal(providerRequests, 0, routePath);
     await page.close();
   }

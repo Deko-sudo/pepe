@@ -49,6 +49,7 @@
       emit("provider-frame-created");
       frame.addEventListener("load", () => {
         emit("provider-frame-document-loaded");
+        document.querySelector("[data-loading-state]")?.setAttribute("hidden", "");
         if (timerId !== null) window.clearTimeout(timerId);
       }, { once: true });
     });

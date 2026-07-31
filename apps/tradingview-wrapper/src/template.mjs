@@ -42,5 +42,5 @@ export function pageDocument(config) {
 }
 
 export function invalidDocument() {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow,noarchive"><title>Invalid technical validation chart route</title><link rel="stylesheet" href="/assets/wrapper.css"></head><body><main class="wrapper"><p class="banner">Technical validation build. Public production display is not approved.</p><h1>Invalid chart route</h1><p role="alert">This local wrapper accepts only documented canonical chart routes.</p></main></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Invalid TradingView wrapper route</title><link rel="stylesheet" href="/assets/wrapper.css"></head><body><main class="wrapper"><p class="banner">Technical validation build. Public production display is not approved.</p><h1>Invalid chart route</h1><p>The requested technical-validation route is not configured.</p></main><script src="/assets/invalid.js" defer></script></body></html>`;
 }

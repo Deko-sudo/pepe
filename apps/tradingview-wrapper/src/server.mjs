@@ -45,6 +45,7 @@ const harnessHeaders = Object.freeze({
 });
 
 function contentType(file) {
+  if (file.endsWith(`${path.sep}health`)) return "text/plain; charset=utf-8";
   if (file.endsWith(".html") || !path.extname(file)) return "text/html; charset=utf-8";
   if (file.endsWith(".js")) return "text/javascript; charset=utf-8";
   if (file.endsWith(".css")) return "text/css; charset=utf-8";
@@ -67,11 +68,11 @@ export function createStaticServer({ root, port, harness = false }) {
     const file = path.resolve(root, target);
     if (!file.startsWith(`${root}${path.sep}`) || !(await stat(file).catch(() => null))?.isFile()) {
       response.writeHead(404, { ...(harness ? harnessHeaders : securityHeaders), "Cache-Control": "no-store", "Content-Type": "text/html; charset=utf-8" });
-      createReadStream(path.join(root, "invalid.html")).pipe(response);
+      createReadStream(path.join(root, "invalid.html")).on("error", () => response.destroy()).pipe(response);
       return;
     }
     const cacheControl = target === "health" || target.endsWith(".html") || !path.extname(target) ? "no-store" : "public, max-age=300";
     response.writeHead(200, { ...(harness ? harnessHeaders : securityHeaders), "Cache-Control": cacheControl, "Content-Type": contentType(file) });
-    createReadStream(file).pipe(response);
+    createReadStream(file).on("error", () => response.destroy()).pipe(response);
   }).listen(port, "127.0.0.1");
 }
