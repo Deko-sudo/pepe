@@ -1,23 +1,16 @@
-from typing import cast
-
 import pytest
-from pydantic import BaseModel, ValidationError
 
 from pepe_quote_core import MarketDataMode, validate_market_data_policy
 
 
-class _ModeModel(BaseModel):
-    mode: MarketDataMode
-
-
 @pytest.mark.parametrize("mode", ["demo", "embedded", "live", "unavailable"])
 def test_market_data_mode_accepts_only_supported_values(mode: str) -> None:
-    assert _ModeModel(mode=cast(MarketDataMode, mode)).mode.value == mode
+    assert MarketDataMode(mode).value == mode
 
 
 def test_market_data_mode_rejects_unknown_value() -> None:
-    with pytest.raises(ValidationError):
-        _ModeModel(mode=cast(MarketDataMode, "provider"))
+    with pytest.raises(ValueError):
+        MarketDataMode("provider")
 
 
 @pytest.mark.parametrize(
