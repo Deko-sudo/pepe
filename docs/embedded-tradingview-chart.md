@@ -1,17 +1,9 @@
-# TradingView embedded chart (PR B)
+# Embedded chart delivery foundation (PR B)
 
-PR B is display-only and disabled by default. It is available only when all three settings are explicitly set: `MARKET_DATA_MODE=embedded`, `EMBEDDED_CHART_PROVIDER=tradingview`, and `EMBEDDED_CHART_ENABLED=true`.
+No chart provider is selected or implemented. Embedded charts are disabled by default: `EMBEDDED_CHART_ENABLED=false` and `EMBEDDED_CHART_PROVIDER=none`.
 
-The integration uses TradingView's official Advanced Chart iframe endpoint, not TradingView JavaScript in Pepe's origin. The iframe receives no Pepe authentication or Telegram data. Pepe neither retrieves nor stores raw quote/candle data from the frame.
+The authenticated market capability contract is authoritative. In `embedded` mode, numeric quotes, server candles, quote cards, and embedded content are unavailable. The capability reason is `embedded_chart_provider_not_configured`; the embedded-config endpoint validates only canonical Pepe slugs (`btc-usdt`, `eth-usdt`, `xau-usd`) and timeframes (`1m`, `5m`, `15m`, `1h`, `4h`, `1d`) before returning private, no-store HTTP 409.
 
-## Allowlisted mappings
+The Mini App preserves asset and timeframe selection and renders an accessible provider-not-configured state. It loads no external content, script, fallback URL, or synthetic market values in embedded mode. PR A quote/candle fail-closed behavior remains active.
 
-| Pepe slug | TradingView symbol | source semantics |
-| --- | --- | --- |
-| `btc-usdt` | `BINANCE:BTCUSDT` | Binance BTC/USDT spot (exchange-specific) |
-| `eth-usdt` | `BINANCE:ETHUSDT` | Binance ETH/USDT spot (exchange-specific) |
-| `xau-usd` | `OANDA:XAUUSD` | OANDA gold spot / USD reference |
-
-All mappings permit `1m`, `5m`, `15m`, `1h`, `4h`, and `1d`. The UI keeps TradingView attribution visible and offers only a user-initiated allowlisted TradingView fallback link. Delay status is provider/venue-dependent and is not asserted by Pepe.
-
-The Mini App CSP permits framing only `https://www.tradingview-widget.com`; no TradingView script or top-level `connect-src` exception is added. Production activation requires owner physical-device testing. Regional availability is not guaranteed for the Russian Federation or DPR.
+A future provider needs explicit owner approval for official embedding support, public-display rights, regional availability, instrument equivalence, narrow CSP allowlisting, and Telegram Android/Desktop testing. Any provider-specific iframe, script, domain, wrapper, fallback, credential, raw-data processing, or Stage 9 behavior remains out of scope.

@@ -6,8 +6,9 @@ from fastapi.responses import JSONResponse
 from app.api.dependencies.session import require_current_session
 from app.core.config import settings
 from app.core.market_data import (
+    CanonicalMarketSlug,
+    CanonicalTimeframe,
     capabilities_for,
-    embedded_chart_config,
     unavailable_market_data_error,
 )
 from app.modules.sessions.service import AuthenticatedSession
@@ -33,25 +34,15 @@ async def get_market_data_capabilities(
 @router.get("/embedded-chart-config")
 async def get_embedded_chart_config(
     _auth: Annotated[AuthenticatedSession, Depends(require_current_session)],
-    slug: Annotated[str, Query(min_length=1, max_length=64)],
-    timeframe: Annotated[str, Query(min_length=1, max_length=8)],
+    slug: Annotated[CanonicalMarketSlug, Query()],
+    timeframe: Annotated[CanonicalTimeframe, Query()],
 ) -> JSONResponse:
-    capabilities = capabilities_for(
-        settings.market_data_mode,
-        provider=settings.embedded_chart_provider,
-        enabled=settings.embedded_chart_enabled,
+    return JSONResponse(
+        status_code=409,
+        content=unavailable_market_data_error(
+            settings.market_data_mode,
+            "embedded_chart",
+            reason_code="embedded_chart_provider_not_configured",
+        ),
+        headers=_CACHE_CONTROL,
     )
-    if not capabilities.embedded_chart_available:
-        return JSONResponse(
-            status_code=409,
-            content=unavailable_market_data_error(settings.market_data_mode, "embedded_chart"),
-            headers=_CACHE_CONTROL,
-        )
-    config = embedded_chart_config(slug, timeframe)
-    if config is None:
-        return JSONResponse(
-            status_code=409,
-            content=unavailable_market_data_error(settings.market_data_mode, "embedded_chart"),
-            headers=_CACHE_CONTROL,
-        )
-    return JSONResponse(content=config.model_dump(), headers=_CACHE_CONTROL)

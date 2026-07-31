@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     quote_fake_provider_enabled: bool = False
     candle_fake_provider_enabled: bool = False
     market_data_mode: MarketDataMode = MarketDataMode.DEMO
-    embedded_chart_provider: Literal["none", "tradingview"] = "none"
+    embedded_chart_provider: Literal["none"] = "none"
     embedded_chart_enabled: bool = False
     quote_source_label: str = _synthetic_quote_source_label
     quote_venue_label: str = _synthetic_quote_venue_label
@@ -96,8 +96,8 @@ class Settings(BaseSettings):
             quote_fake_provider_enabled=self.quote_fake_provider_enabled,
             candle_fake_provider_enabled=self.candle_fake_provider_enabled,
         )
-        if self.embedded_chart_enabled and self.embedded_chart_provider != "tradingview":
-            raise ValueError("embedded_chart_enabled requires embedded_chart_provider=tradingview")
+        if self.embedded_chart_enabled:
+            raise ValueError("embedded_chart_enabled requires an approved embedded chart provider")
         if self.market_data_mode is not MarketDataMode.EMBEDDED and (
             self.embedded_chart_enabled
             or self.embedded_chart_provider != "none"

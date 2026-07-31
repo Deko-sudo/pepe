@@ -32,6 +32,7 @@ import { candleStatistics, formatDecimal, formatSignedDecimal } from "@/shared/l
 import { useModalStore } from "@/shared/lib/store";
 import { useTelegramAuth } from "@/shared/telegram";
 import { Modal } from "@/shared/ui/modal";
+import { EmbeddedMarketChart } from "./embedded-market-chart";
 
 import { AssetIcon } from "./asset-icon";
 import { normalizeCandles } from "./chart-data";
@@ -422,7 +423,7 @@ export function MarketHome() {
   if (capabilities.isError) {
     return <BlockingState title="Не удалось определить доступность рыночных данных" message="Проверьте подключение и повторите запрос." retry={() => void capabilities.refetch()} />;
   }
-  if (!hasMachineReadableMarketData) {
+  if (!hasMachineReadableMarketData && capabilities.data?.mode !== "embedded") {
     return <BlockingState title="Рыночные данные недоступны" message="Внешний источник графика ещё не настроен. Числовые котировки и свечи сейчас не отображаются." />;
   }
   if (catalog.isLoading) return <DashboardSkeleton />;
@@ -443,6 +444,25 @@ export function MarketHome() {
   const selected = selectedAsset;
   if (!selected) {
     return <BlockingState title="Инструменты пока недоступны" message="Каталог не содержит активных рыночных инструментов." retry={() => void catalog.refetch()} />;
+  }
+  if (!hasMachineReadableMarketData) {
+    return (
+      <main className="market-home">
+        <header className="home-header safe-area-top">
+          <div><span className="section-kicker">Market intelligence</span><h1>Pepe</h1></div>
+          <span className="home-status"><i />Secure · <small aria-label="Сборка Mini App">{BUILD_ID}</small></span>
+        </header>
+        <section className="chart-card">
+          <div className="chart-toolbar" role="group" aria-label="Инструмент">
+            {trackedAssets.map((asset) => <button key={asset.slug} type="button" aria-pressed={asset.slug === selected.slug} onClick={() => setSelectedSlug(asset.slug)}>{asset.symbol}</button>)}
+          </div>
+          <div className="chart-toolbar" role="group" aria-label="Таймфрейм">
+            {TIMEFRAMES.map((value) => <button key={value} type="button" aria-pressed={timeframe === value} onClick={() => setTimeframe(value)}>{value}</button>)}
+          </div>
+        </section>
+        <EmbeddedMarketChart state="provider-not-configured" />
+      </main>
+    );
   }
   const selectedQuote = quotes.data?.items.find((quote) => quote.slug === selected.slug);
   const selectedFreshness = selectedQuote
