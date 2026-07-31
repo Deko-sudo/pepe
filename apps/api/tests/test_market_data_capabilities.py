@@ -58,3 +58,28 @@ async def test_capabilities_are_authenticated_and_private_no_store(client: Async
     assert response.json()["contract_version"] == "v1"
     assert response.json()["mode"] == "demo"
     assert response.json()["numeric_quotes_available"] is True
+
+
+@pytest.mark.asyncio
+async def test_embedded_chart_config_is_allowlisted_and_private(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "market_data_mode", MarketDataMode.EMBEDDED)
+    monkeypatch.setattr(settings, "embedded_chart_provider", "tradingview")
+    monkeypatch.setattr(settings, "embedded_chart_enabled", True)
+
+    response = await client.get(
+        "/api/v1/market-data/embedded-chart-config?slug=btc-usdt&timeframe=1h",
+    )
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "private, no-store"
+    assert response.json()["provider_symbol"] == "BINANCE:BTCUSDT"
+    assert response.json()["interval"] == "1h"
+    assert response.json()["iframe_url"].startswith(
+        "https://www.tradingview-widget.com/embed-widget/advanced-chart/",
+    )
+    blocked = await client.get(
+        "/api/v1/market-data/embedded-chart-config?slug=unknown&timeframe=1h",
+    )
+    assert blocked.status_code == 409

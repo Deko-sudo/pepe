@@ -53,6 +53,22 @@ export const MarketDataCapabilitiesSchema = z.object({
 });
 export type MarketDataCapabilities = z.infer<typeof MarketDataCapabilitiesSchema>;
 
+export const EmbeddedChartConfigSchema = z.object({
+  contract_version: z.literal("v1"),
+  provider: z.literal("tradingview"),
+  canonical_slug: z.enum(["btc-usdt", "eth-usdt", "xau-usd"]),
+  provider_symbol: z.string(),
+  interval: TimeframeSchema,
+  source_label: z.string(),
+  display_name: z.string(),
+  market_semantics: z.string(),
+  delay_disclosure: z.string(),
+  iframe_url: z.string().url(),
+  fallback_url: z.string().url(),
+  attribution: z.string(),
+});
+export type EmbeddedChartConfig = z.infer<typeof EmbeddedChartConfigSchema>;
+
 async function request<T>(path: string, schema: z.ZodType<T>): Promise<T> {
   let response: Response;
   try { response = await fetch(`${API_BASE}${path}`, withSessionAuth()); }
@@ -62,6 +78,7 @@ async function request<T>(path: string, schema: z.ZodType<T>): Promise<T> {
 }
 export const getAssets = () => request("/assets?limit=100", CatalogSchema);
 export const getMarketDataCapabilities = () => request("/market-data/capabilities", MarketDataCapabilitiesSchema);
+export const getEmbeddedChartConfig = (slug: string, timeframe: Timeframe) => request(`/market-data/embedded-chart-config?slug=${encodeURIComponent(slug)}&timeframe=${timeframe}`, EmbeddedChartConfigSchema);
 export const getQuotes = (slugs: string[]) => {
   const query = slugs.map((slug) => `slug=${encodeURIComponent(slug)}`).join("&");
   return request(`/assets/quotes?${query}`, QuoteBatchSchema);
