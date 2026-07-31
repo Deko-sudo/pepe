@@ -1,11 +1,11 @@
 # Provider-specific embedded-chart delivery roadmap
 
-> **Status:** PROPOSED — OWNER APPROVAL REQUIRED. This is documentation only. It selects no provider and authorizes no runtime, CSP, CI, infrastructure, credential, ingestion, persistence, analytics, or Stage 9 change.
-> **Baseline:** `main` at `83e3b02bb2f5321ed1d0188213401ee8c20a9e35`, after the merged provider-neutral embedded-chart foundation.
+> **Status:** REVISED — isolated TradingView-wrapper direction is owner-approved for architecture qualification; implementation remains separately gated. This document authorizes no runtime, CSP, CI, infrastructure, credential, ingestion, persistence, analytics, or Stage 9 change.
+> **Baseline:** `main` at `4f83ce3e873410c156d0aa0480b84daff08d3177`, after merged PR #17 direct-iframe research.
 
 ## 1. Purpose and scope
 
-This roadmap defines the ordered, separately reviewed work needed to deliver a provider-specific, display-only embedded chart after an owner selects a provider. It prevents the implementation PRs from re-deciding architecture: the initial direction is an **officially documented direct iframe** integration, not provider JavaScript in Pepe's top-level Mini App document.
+This roadmap defines the ordered, separately reviewed work needed to deliver a provider-specific, display-only embedded chart. The direct-iframe-first path did not qualify a provider in C1. The owner subsequently approved an **isolated TradingView wrapper**: TradingView script runs only on a separate wrapper origin, while the Mini App embeds only that wrapper origin. See [isolated TradingView wrapper architecture](isolated-tradingview-wrapper-architecture.md).
 
 The scope is BTC/USDT, ETH/USDT, and XAU/USD at `1m`, `5m`, `15m`, `1h`, `4h`, and `1d`, with a production activation only after all explicit gates below pass.
 
@@ -21,13 +21,12 @@ The merged foundation is server-authoritative and fail-closed:
 
 ## 3. Owner-approved direction
 
-1. Prefer a provider with officially supported direct iframe delivery.
-2. Do not select TradingView for the first implementation under this roadmap. If no acceptable direct-iframe provider qualifies, stop for owner re-approval.
-3. TradingView remains only a future migration/fallback candidate, not a selected implementation.
-4. Provider-specific work is delivered in separate PRs after roadmap approval.
-5. Telegram Android and Telegram Desktop physical validation are mandatory.
-6. Russia/DPR availability is recorded honestly but is not an initial planning blocker. Do not claim guaranteed availability, build jurisdiction-specific bypasses, send identity data, or treat VPN use as a technical/legal guarantee.
-7. Production activation is intended only after technical, security, device, rollback, and CI gates pass.
+1. The direct-iframe C1 conclusion remains historical evidence; it selected no provider.
+2. The owner-approved replacement direction is the isolated TradingView wrapper documented in PR W1; it is not a direct TradingView iframe or a top-level Pepe script integration.
+3. Provider-specific work is delivered in focused PRs after each applicable gate.
+4. Telegram Android and Telegram Desktop physical validation are mandatory.
+5. Russia/DPR availability is recorded honestly but is not an initial planning blocker. Do not claim guaranteed availability, build jurisdiction-specific bypasses, send identity data, or treat VPN use as a technical/legal guarantee.
+6. Production activation is intended only after technical, terms, security, device, rollback, infrastructure, and CI gates pass.
 
 ## 4. Non-goals
 
@@ -128,12 +127,14 @@ Publish the selected provider's dated official documentation/terms evidence, att
 
 ## 19. Planned pull requests
 
-1. **PR C1 — Provider research and selection:** **completed with no qualified single provider**; see [direct-iframe qualification results](direct-iframe-provider-selection.md). The current conclusion preserves the fail-closed foundation and requires a separate owner decision before renewed research. Stop before merge.
-2. **PR C2 — Provider-specific backend contract:** enum/validation, allowlisted mappings, successful config response, tests; no frontend iframe. Stop before merge.
-3. **PR C3 — Frontend direct iframe integration:** dashboard and `/markets`, lifecycle/attribution/timeout/retry/fallback, no quote/candle requests. Stop before merge.
-4. **PR C4 — CSP and provider-blocking hardening:** exact CSP/domain allowlist, SPA-header verification, outage/security tests. Stop before merge.
-5. **PR C5 — CI main-push hardening:** push-to-main workflow, exact-SHA proof, remediation documentation. Stop before merge.
-6. **PR C6 — Telegram validation and production activation:** Android/Desktop evidence, kill-switch/rollback exercise, production configuration, launch checklist. Stop before merge.
+1. **PR C1 — Direct-iframe provider research:** **completed with no qualified single provider**; see [direct-iframe qualification results](direct-iframe-provider-selection.md). Its direct-iframe restriction is superseded by the later owner decision below, not rewritten.
+2. **PR W1 — Wrapper architecture qualification:** this [isolated TradingView wrapper architecture](isolated-tradingview-wrapper-architecture.md), including official mechanism, proposed mappings/intervals, isolation, terms assessment, CSP/sandbox design, and revised sequence. Stop before merge.
+3. **PR W2 — Static isolated wrapper foundation:** canonical static routes, official script only inside wrapper, local/test hosting and wrapper headers/CSP; no Mini App integration or production DNS. Stop before merge.
+4. **PR W3 — Backend wrapper configuration contract:** provider enum, wrapper-origin config, allowlisted routes, successful versioned config and startup validation; no arbitrary URL/symbol. Stop before merge.
+5. **PR W4 — Mini App wrapper integration:** dashboard and `/markets`, iframe lifecycle, timeout/retry/fallback, capability revalidation, no quote/candle requests or DEMO fallback. Stop before merge.
+6. **PR W5 — CSP, blocking, and rollback hardening:** exact parent `frame-src`, sandbox, effective-header tests, provider blocking, active-client kill switch, rollback exercise, privacy-safe telemetry. Stop before merge.
+7. **PR W6 — CI main-push hardening:** push-to-main workflow, exact-main SHA evidence, and remediation; must merge before production activation. Stop before merge.
+8. **PR W7 — Telegram validation and production activation:** production wrapper origin, DNS/TLS, Android/Desktop evidence, production config, kill-switch exercise, and launch checklist. Stop before merge.
 
 Do not combine this sequence into an oversized PR unless the owner explicitly changes the plan.
 
@@ -143,11 +144,11 @@ Before production: an owner-approved direct-iframe provider with official integr
 
 ## 21. Owner decisions still required
 
-- final provider and exact instrument/interval identifiers;
-- whether split providers are acceptable;
-- fallback-link policy and exact production CSP/fallback domains;
-- activation date and whether TradingView remains documented as a future alternative;
-- optional iOS smoke requirement.
+- exact production wrapper hostname, hosting platform, DNS procedure, and TLS management;
+- final accepted OANDA XAU/USD semantics and visible disclosure;
+- fallback-link policy, popup policy, and exact production wrapper/Pepe CSP domains;
+- written TradingView public-display confirmation before production;
+- activation date and optional iOS smoke requirement.
 
 No timeout or non-response is approval.
 
