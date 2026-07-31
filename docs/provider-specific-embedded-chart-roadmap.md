@@ -11,7 +11,7 @@ The scope is BTC/USDT, ETH/USDT, and XAU/USD at `1m`, `5m`, `15m`, `1h`, `4h`, a
 
 ## 2. Current foundation
 
-The merged foundation is server-authoritative and fail closed:
+The merged foundation is server-authoritative and fail-closed:
 
 - `MarketDataMode` supports `demo`, `embedded`, `live`, and `unavailable`.
 - Embedded charts default to `EMBEDDED_CHART_ENABLED=false` and `EMBEDDED_CHART_PROVIDER=none`.
@@ -22,7 +22,7 @@ The merged foundation is server-authoritative and fail closed:
 ## 3. Owner-approved direction
 
 1. Prefer a provider with officially supported direct iframe delivery.
-2. Do not select TradingView for the first implementation unless the qualification gate finds no acceptable direct-iframe provider.
+2. Do not select TradingView for the first implementation under this roadmap. If no acceptable direct-iframe provider qualifies, stop for owner re-approval.
 3. TradingView remains only a future migration/fallback candidate, not a selected implementation.
 4. Provider-specific work is delivered in separate PRs after roadmap approval.
 5. Telegram Android and Telegram Desktop physical validation are mandatory.
@@ -68,9 +68,9 @@ A successful configuration contains only validated public fields:
 - provider and configuration version;
 - canonical slug and approved provider instrument identifier;
 - canonical timeframe and provider interval;
-- allowlisted iframe URL;
+- HTTPS iframe URL on an exact allowlisted origin;
 - source and venue labels, market semantics, delay disclosure, and required attribution;
-- an optional separately allowlisted, user-triggered fallback URL.
+- an optional HTTPS fallback URL on a separately allowlisted origin, triggered only by the user.
 
 Unavailable cases remain versioned `market_data_unavailable` and use: `embedded_chart_provider_not_configured`, `embedded_chart_disabled`, `embedded_chart_provider_unavailable`, `embedded_chart_instrument_unsupported`, `embedded_chart_timeframe_unsupported`, `embedded_chart_region_blocked`, and `embedded_chart_configuration_invalid`. `region_blocked` reports a result; it never suggests circumvention.
 
@@ -82,15 +82,15 @@ Only after validated configuration may the direct iframe mount in a responsive P
 
 ## 10. Security and privacy
 
-All mappings, URLs, symbols, intervals, fallback destinations, and provider domains are server controlled and explicit allowlists. No top-level provider script, raw extraction, persistence, analytics, provider proxy, iframe DOM access, or `postMessage` parsing is permitted. Iframe and fallback URLs carry no Pepe credential or Telegram data. No automatic external navigation is permitted.
+All mappings, URLs, symbols, intervals, fallback destinations, and provider domains are server-controlled and come from explicit allowlists. No top-level provider script, raw extraction, persistence, analytics, provider proxy, iframe DOM access, or `postMessage` parsing is permitted. Iframe and fallback URLs carry no Pepe credential or Telegram data. No automatic external navigation is permitted.
 
 ## 11. CSP and domain allowlisting
 
-A later security PR adds only owner-approved exact iframe domains. It must use no wildcard `frame-src`, provider `script-src`, `unsafe-inline`, `unsafe-eval`, unnecessary `connect-src`, or broad `img-src`. It uses minimum iframe permissions, no top navigation, restrictive referrer policy, and a separately allowlisted fallback domain. Tests must prove CSP is emitted on SPA HTML responses despite Nginx header inheritance.
+A later security PR adds only owner-approved exact HTTPS iframe domains. It must use no wildcard `frame-src`, provider `script-src`, `unsafe-inline`, `unsafe-eval`, unnecessary `connect-src`, or broad `img-src`. The iframe must use `sandbox` and an explicit minimal `allow` list containing only provider-required permissions; top navigation, popups, and downloads remain prohibited unless separately owner-approved and tested. It uses a restrictive referrer policy and a separately allowlisted HTTPS fallback domain. Tests must prove CSP is emitted on SPA HTML responses despite Nginx header inheritance, and that an HTTPS iframe redirect to HTTP is blocked and surfaced unavailable.
 
 ## 12. Error handling and provider blocking
 
-The health model is `configured`, `loading`, `ready`, `degraded`, `blocked`, `unavailable`, and `disabled`. The component has a bounded load timeout, cancels it after successful load, and retries by remounting the iframe with bounded user-triggered attempts—never a retry storm.
+The health model is `configured`, `loading`, `iframe-loaded`, `ready`, `degraded`, `blocked`, `unavailable`, and `disabled`. A cross-origin `load` callback means only `iframe-loaded`; it is not chart readiness or provider health. `ready` requires an approved, origin-validated, non-market readiness signal from the selected provider; without one, provider health remains unknown. The component has a bounded load timeout, cancels it after the frame document loads, and retries by remounting the iframe with bounded user-triggered attempts—never a retry storm.
 
 Handle browser offline state, DNS/network failure, and observable CSP blocking. Cross-origin browser isolation cannot always diagnose a precise cause; when it cannot, show generic provider unavailable. The whole Mini App, selector navigation, and auth remain usable. A fallback link is user-triggered only, uses `noopener,noreferrer`, contains no identity/session parameters, and never automatically redirects. Failure never switches to DEMO or fabricates values.
 
@@ -106,9 +106,9 @@ Activation requires owner approval, verified public-display rights, official int
 
 ## 15. Kill switch and rollback
 
-The immediate controls are `MARKET_DATA_MODE=unavailable` or `EMBEDDED_CHART_ENABLED=false`. They remove the iframe, cease provider display requests, keep quote/candle requests disabled, invalidate cached display configuration, and show a neutral unavailable state without a code deployment where practical.
+The immediate controls are `MARKET_DATA_MODE=unavailable` or `EMBEDDED_CHART_ENABLED=false`. A later implementation must define bounded capability polling or validated revalidation while an embedded chart is mounted, so active clients receive the kill switch, unmount the iframe, cease provider display requests, invalidate cached display configuration, and show a neutral unavailable state. Until that mechanism is implemented, rollback applies on the next Mini App load/reload and must not be described as immediate for already-open clients. Quote/candle requests remain disabled in either state.
 
-Operational runbook: set the approved deployment control; verify capability and config endpoint fail closed; verify iframe removal and no DEMO fallback; record recovery state; only re-enable after root cause and owner approval. Trigger shutdown for terms changes, blocking, security incidents, broken mappings/semantics, or widespread iframe failure.
+Operational runbook: set the approved deployment control; verify capability and config endpoint fail closed; test a currently active client plus a fresh load/reload; verify iframe removal and no DEMO fallback; record recovery state; only re-enable after root cause and owner approval. Trigger shutdown for terms changes, blocking, security incidents, broken mappings/semantics, or widespread iframe failure.
 
 ## 16. Observability
 
@@ -139,7 +139,7 @@ Do not combine this sequence into an oversized PR unless the owner explicitly ch
 
 ## 20. Acceptance criteria
 
-Before production: an owner-approved direct-iframe provider with official integration/public-display evidence; approved exact mappings and intervals or approved unavailable handling; no top-level provider script/arbitrary URL/symbol; no Telegram/session data, extraction, persistence, or analytics; visible attribution/source/delay; working timeout/retry/blocked/outage states; successful kill switch/rollback; Android/Desktop evidence; CI main-push hardening merged with green exact-main CI; and Stage 9 unchanged.
+Before production: an owner-approved direct-iframe provider with official integration/public-display evidence; approved exact mappings and intervals or approved unavailable handling; no top-level provider script/arbitrary URL/symbol; no Telegram/session data, extraction, persistence, or analytics; visible provider/source/venue/market semantics/delay/attribution; user-triggered fallback with `noopener,noreferrer`; working timeout/retry/blocked/outage states; successful kill switch/rollback; Android/Desktop evidence; CI main-push hardening merged with green exact-main CI; and Stage 9 unchanged.
 
 ## 21. Owner decisions still required
 
