@@ -1,0 +1,14 @@
+{
+  "name": "@pepe/tradingview-wrapper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node src/build.mjs",
+    "lint": "node src/lint.mjs",
+    "typecheck": "node src/typecheck.mjs",
+    "test": "node --test tests/routes.test.mjs tests/security.test.mjs tests/server.test.mjs",
+    "e2e": "node --test tests/*.browser.test.mjs",
+    "provider-check": "node src/provider-check.mjs"
+  }
+}

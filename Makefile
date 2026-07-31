@@ -1,4 +1,4 @@
-.PHONY: help up down build rebuild logs ps test lint format typecheck migrate migration shell-api shell-db clean
+.PHONY: help up down build rebuild logs ps test lint format typecheck migrate migration shell-api shell-db clean tradingview-wrapper-lint tradingview-wrapper-typecheck tradingview-wrapper-test tradingview-wrapper-build tradingview-wrapper-e2e tradingview-wrapper-provider-check
 
 MINI_APP_BUILD_ID ?= $(shell git rev-parse --short=8 HEAD)
 export MINI_APP_BUILD_ID
@@ -12,7 +12,7 @@ up: ## Start all services after database migrations
 down: ## Stop all services
 	docker compose down
 
-build: ## Build all services
+build: tradingview-wrapper-build ## Build all services
 	docker compose build
 
 rebuild: ## Rebuild all services without cache
@@ -24,14 +24,14 @@ logs: ## Show logs for all services
 ps: ## Show running containers
 	docker compose ps
 
-test: ## Run all tests
+test: tradingview-wrapper-test ## Run all tests
 	cd apps/mini-app && npm test
 	cd packages/quote-core && ../../apps/api/.venv/bin/python -m pytest
 	cd apps/api && .venv/bin/python -m pytest
 	cd apps/bot && .venv/bin/python -m pytest
 	cd apps/worker && .venv/bin/python -m pytest
 
-lint: ## Run linters
+lint: tradingview-wrapper-lint ## Run linters
 	cd apps/mini-app && npm run lint
 	cd packages/quote-core && ../../apps/api/.venv/bin/ruff check .
 	cd apps/api && .venv/bin/ruff check .
@@ -45,7 +45,7 @@ format: ## Format code
 	cd apps/bot && .venv/bin/ruff format .
 	cd apps/worker && .venv/bin/ruff format .
 
-typecheck: ## Run type checkers
+typecheck: tradingview-wrapper-typecheck ## Run type checkers
 	cd apps/mini-app && npm run typecheck
 	cd packages/quote-core && ../../apps/api/.venv/bin/mypy src tests
 	cd apps/api && .venv/bin/mypy .
@@ -70,3 +70,21 @@ clean: ## Clean build artifacts
 	rm -rf apps/bot/dist
 	rm -rf apps/worker/dist
 	docker compose down -v --rmi local
+
+tradingview-wrapper-lint: ## Lint static TradingView wrapper
+	cd apps/tradingview-wrapper && npm run lint
+
+tradingview-wrapper-typecheck: ## Typecheck static TradingView wrapper
+	cd apps/tradingview-wrapper && npm run typecheck
+
+tradingview-wrapper-test: tradingview-wrapper-build ## Test static TradingView wrapper
+	cd apps/tradingview-wrapper && npm test
+
+tradingview-wrapper-build: ## Build static TradingView wrapper
+	cd apps/tradingview-wrapper && npm run build
+
+tradingview-wrapper-e2e: tradingview-wrapper-build ## Run isolated wrapper browser tests
+	cd apps/tradingview-wrapper && npm run e2e
+
+tradingview-wrapper-provider-check: ## Compare observed official TradingView script hash
+	cd apps/tradingview-wrapper && npm run provider-check
