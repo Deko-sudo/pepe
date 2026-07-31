@@ -9,6 +9,7 @@ import { useModalStore } from "../src/shared/lib/store";
 const api = vi.hoisted(() => ({
   getAssets: vi.fn(),
   getCandles: vi.fn(),
+  getMarketDataCapabilities: vi.fn(),
   getQuotes: vi.fn(),
 }));
 
@@ -33,6 +34,17 @@ function renderDashboard() {
 beforeEach(() => {
   vi.clearAllMocks();
   useModalStore.setState({ aiSupportOpen: false });
+  api.getMarketDataCapabilities.mockResolvedValue({
+    contract_version: "v1",
+    mode: "demo",
+    status: "available",
+    numeric_quotes_available: true,
+    server_candles_available: true,
+    embedded_chart_available: false,
+    analytics_available: false,
+    quote_cards_visible: true,
+    unavailable_reason_code: null,
+  });
   api.getAssets.mockResolvedValue({
     items: [{
       id: "00000000-0000-4000-8000-000000000001", slug: "btc-usdt", symbol: "BTC/USDT", display_name: "Bitcoin",
