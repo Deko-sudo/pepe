@@ -10,7 +10,7 @@ W1 and W2 are merged. W3 is delivered by this PR and awaits owner merge approval
 
 The enabled provider requires `MARKET_DATA_MODE=embedded`, a non-empty wrapper origin, and a development/test environment. Production rejects the provider without a bypass. Disabled/provider-none with an empty origin succeeds; every contradictory combination fails settings validation.
 
-The origin is parsed without DNS or HTTP access. It must be a bare HTTP(S) origin with no credentials, path (other than `/`), query, fragment, wildcard, whitespace, control character, backslash, or percent encoding. Scheme and DNS host are lowercased, one trailing DNS root dot is removed, and default ports are removed. HTTP is permitted only for `http://127.0.0.1` in development/test. HTTPS accepts DNS names and global IP literals only; private, loopback, link-local, unspecified, multicast, reserved, metadata, and non-ASCII hosts are rejected.
+The origin is parsed without DNS or HTTP access. It must be a bare HTTP(S) origin with no credentials, path (other than `/`), query, fragment, wildcard, whitespace, control character, backslash, or percent encoding. Scheme and DNS host are lowercased, one trailing DNS root dot is removed, and default ports are removed. HTTP is permitted only for `http://127.0.0.1` in development/test. HTTPS accepts only validated ASCII DNS names: all IPv4/IPv6 literals and browser-normalized numeric IPv4 spellings are rejected.
 
 ## Authenticated configuration API
 

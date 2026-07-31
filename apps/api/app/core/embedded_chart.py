@@ -10,6 +10,7 @@ EMBEDDED_CHART_CONTRACT_VERSION: Literal[1] = 1
 CanonicalMarketSlug = Literal["btc-usdt", "eth-usdt", "xau-usd"]
 CanonicalTimeframe = Literal["1m", "5m", "15m", "1h", "4h", "1d"]
 _DNS_LABEL = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
+_BROWSER_IPV4_COMPONENT = re.compile(r"(?:0x[0-9a-f]+|0[0-7]*|[0-9]+)$", re.IGNORECASE)
 
 
 class EmbeddedChartProvider(StrEnum):
@@ -22,6 +23,14 @@ def _valid_dns_hostname(hostname: str) -> bool:
         1 <= len(hostname) <= 253
         and hostname not in {"localhost", "metadata.google.internal"}
         and all(_DNS_LABEL.fullmatch(label) for label in hostname.split("."))
+    )
+
+
+def _looks_like_browser_ipv4(hostname: str) -> bool:
+    """Identify legacy browser IPv4 spellings without resolving a host."""
+    components = hostname.split(".")
+    return 1 <= len(components) <= 4 and all(
+        _BROWSER_IPV4_COMPONENT.fullmatch(component) for component in components
     )
 
 
@@ -57,12 +66,10 @@ def canonical_wrapper_origin(value: str, *, environment: str) -> str:
     if scheme == "http":
         if environment not in {"development", "test"} or hostname != "127.0.0.1":
             raise ValueError(
-                (
-                    "embedded_chart_wrapper_origin permits HTTP only for "
-                    "127.0.0.1 in development or test"
-                ),
+                "embedded_chart_wrapper_origin permits HTTP only for "
+                "127.0.0.1 in development or test",
             )
-    elif address is not None:
+    elif address is not None or _looks_like_browser_ipv4(hostname):
         raise ValueError("embedded_chart_wrapper_origin host is not allowed")
     if address is None and not _valid_dns_hostname(hostname):
         raise ValueError("embedded_chart_wrapper_origin hostname is not allowed")

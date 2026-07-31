@@ -97,6 +97,8 @@ async def test_embedded_mode_capabilities_fail_closed_without_a_provider(
         "numeric_quotes_available": False,
         "server_candles_available": False,
         "embedded_chart_available": False,
+        "embedded_chart_provider": None,
+        "embedded_chart_config_version": None,
         "analytics_available": False,
         "quote_cards_visible": False,
         "unavailable_reason_code": "embedded_chart_provider_not_configured",
@@ -152,6 +154,13 @@ def test_wrapper_origin_validation_and_settings_matrix() -> None:
         "https://*.example.test",
         "https://wrapper.example.test\\@evil.test",
         "https://wrapper.example.test/%2fchart",
+        "https://2130706433",
+        "https://127.1",
+        "https://127.0.1",
+        "https://017700000001",
+        "https://0177.0.0.1",
+        "https://0x7f000001",
+        "https://0x7f.0.0.1",
     )
     for invalid in invalid_origins:
         with pytest.raises(ValueError):

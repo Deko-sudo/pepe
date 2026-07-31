@@ -30,7 +30,7 @@ async def get_market_data_capabilities(
             settings.market_data_mode,
             provider=settings.embedded_chart_provider,
             enabled=settings.embedded_chart_enabled,
-        ).model_dump(mode="json", exclude_none=True),
+        ).model_dump(mode="json"),
         headers=_CACHE_CONTROL,
     )
 
