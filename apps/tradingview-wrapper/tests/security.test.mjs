@@ -23,9 +23,19 @@ test("wrapper CSP is exact, explicit, and excludes unsafe provider sources", () 
 
 test("provider metadata records observed—not pinned—script change evidence", async () => {
   const metadata = JSON.parse(await readFile(path.join(root, "provider/tradingview-script.json"), "utf8"));
+  assert.deepEqual(Object.keys(metadata).sort(), ["accessDate", "lastValidationDate", "notes", "observedFinalUrl", "observedSha256", "officialDocumentationTitle", "officialDocumentationUrl", "officialUrl", "retrievalResult", "status"]);
   assert.equal(metadata.officialUrl, "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js");
+  assert.equal(metadata.observedFinalUrl, metadata.officialUrl);
   assert.match(metadata.observedSha256, /^[a-f0-9]{64}$/);
   assert.equal(metadata.status, "observed-not-pinned");
+  assert.match(metadata.accessDate, /^\d{4}-\d{2}-\d{2}$/);
+  assert.match(metadata.lastValidationDate, /^\d{4}-\d{2}-\d{2}$/);
+});
+
+test("provider-check keeps mutable-provider validation manual and fails closed", async () => {
+  const source = await readFile(path.join(root, "src/provider-check.mjs"), "utf8");
+  for (const policy of ["https.get", "redirects >= 3", "Provider redirect has no Location header", "Rejected non-HTTPS redirect", "Unexpected provider status", "currentUrl !== metadata.observedFinalUrl || hash !== metadata.observedSha256"]) assert.ok(source.includes(policy), policy);
+  assert.doesNotMatch(source, /writeFile|rename|unlink/);
 });
 
 test("origin inventory remains metadata-only and rejects HTTP and wildcard approval", async () => {

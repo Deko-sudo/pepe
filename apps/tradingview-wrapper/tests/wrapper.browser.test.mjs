@@ -93,3 +93,19 @@ test("actual wrapper request receives no harness private marker and default sand
   assert.equal(await page.locator("iframe").getAttribute("referrerpolicy"), "no-referrer");
   await page.close();
 });
+
+test("created provider frame that never loads times out once without provider readiness", async () => {
+  const page = await browser.newPage();
+  await page.route("https://s3.tradingview.com/**", (route) => route.fulfill({
+    contentType: "application/javascript",
+    body: "document.querySelector('[data-chart-container]').append(document.createElement('iframe'));",
+  }));
+  await page.goto("http://127.0.0.1:4174/");
+  await page.evaluate(() => window.wrapperHarness.mount("/chart/btc-usdt/1m"));
+  await page.waitForFunction(() => window.wrapperHarness.received.includes("provider-frame-timeout"), null, { timeout: 14_000 });
+  const events = await page.evaluate(() => window.wrapperHarness.received);
+  assert.equal(events.filter((event) => event === "provider-frame-timeout").length, 1);
+  assert.ok(!events.includes("provider-frame-document-loaded"));
+  assert.ok(!events.includes("provider-ready"));
+  await page.close();
+});
