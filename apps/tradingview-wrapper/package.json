@@ -10,5 +10,8 @@
     "test": "node --test tests/routes.test.mjs tests/security.test.mjs tests/server.test.mjs",
     "e2e": "node --test tests/*.browser.test.mjs",
     "provider-check": "node src/provider-check.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.1"
   }
 }

@@ -36,11 +36,12 @@ export function pageDocument(config) {
     <p class="limitation">A provider frame document load does not prove chart readiness. Provider readiness remains unknown.</p>
   </main>
   <script id="wrapper-config" type="application/json">${data}</script>
+  <script defer src="/assets/runtime-config.js"></script>
   <script defer src="/assets/bootstrap.js"></script>
 </body>
 </html>`;
 }
 
 export function invalidDocument() {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Invalid TradingView wrapper route</title><link rel="stylesheet" href="/assets/wrapper.css"></head><body><main class="wrapper"><p class="banner">Technical validation build. Public production display is not approved.</p><h1>Invalid chart route</h1><p>The requested technical-validation route is not configured.</p></main><script src="/assets/invalid.js" defer></script></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Invalid TradingView wrapper route</title><link rel="stylesheet" href="/assets/wrapper.css"></head><body><main class="wrapper"><p class="banner">Technical validation build. Public production display is not approved.</p><h1>Invalid chart route</h1><p>The requested technical-validation route is not configured.</p></main><script src="/assets/runtime-config.js" defer></script><script src="/assets/invalid.js" defer></script></body></html>`;
 }

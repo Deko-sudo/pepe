@@ -2,6 +2,7 @@
   "use strict";
   const TYPE = "pepe.tradingview-wrapper.lifecycle";
   const VERSION = 1;
+  const { harnessOrigin } = window.PEPE_TRADINGVIEW_WRAPPER_RUNTIME;
   const ALLOWED = new Set([
     "wrapper-document-ready",
     "provider-script-load-failed",
@@ -13,12 +14,13 @@
   const SCRIPT_URL = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
   const timeoutMs = 12000;
   let emitted = new Set();
-  let timerId = null;
+  let creationTimerId = null;
+  let loadTimerId = null;
 
   function emit(event) {
     if (!ALLOWED.has(event) || emitted.has(event)) return;
     emitted.add(event);
-    window.parent.postMessage({ type: TYPE, version: VERSION, event }, "*");
+    window.parent.postMessage({ type: TYPE, version: VERSION, event }, harnessOrigin);
   }
 
   function showError() {
@@ -47,10 +49,14 @@
       const frame = container.querySelector("iframe");
       if (!frame || emitted.has("provider-frame-created")) return;
       emit("provider-frame-created");
+      if (creationTimerId !== null) window.clearTimeout(creationTimerId);
+      loadTimerId = window.setTimeout(() => {
+        if (!emitted.has("provider-frame-document-loaded")) { emit("provider-frame-timeout"); showError(); }
+      }, timeoutMs);
       frame.addEventListener("load", () => {
         emit("provider-frame-document-loaded");
         document.querySelector("[data-loading-state]")?.setAttribute("hidden", "");
-        if (timerId !== null) window.clearTimeout(timerId);
+        if (loadTimerId !== null) window.clearTimeout(loadTimerId);
       }, { once: true });
     });
     observer.observe(container, { childList: true, subtree: true });
@@ -66,8 +72,8 @@
     const container = document.querySelector("[data-chart-container]");
     if (!container) return invalid();
     observeFrame(container);
-    timerId = window.setTimeout(() => {
-      if (!emitted.has("provider-frame-document-loaded")) { emit("provider-frame-timeout"); showError(); }
+    creationTimerId = window.setTimeout(() => {
+      if (!emitted.has("provider-frame-created")) { emit("provider-frame-timeout"); showError(); }
     }, timeoutMs);
     const script = document.createElement("script");
     script.src = SCRIPT_URL;
@@ -79,7 +85,8 @@
       hide_top_toolbar: true, save_image: false, withdateranges: false, watchlist: [],
     });
     script.addEventListener("error", () => {
-      if (timerId !== null) window.clearTimeout(timerId);
+      if (creationTimerId !== null) window.clearTimeout(creationTimerId);
+      if (loadTimerId !== null) window.clearTimeout(loadTimerId);
       emit("provider-script-load-failed");
       showError();
     }, { once: true });

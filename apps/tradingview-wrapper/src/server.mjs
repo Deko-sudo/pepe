@@ -2,15 +2,16 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { createServer } from "node:http";
 import path from "node:path";
+import { HARNESS_ORIGIN, WRAPPER_ORIGIN } from "./config.mjs";
 
 export const WRAPPER_CSP = [
   "default-src 'none'",
   "base-uri 'none'",
   "object-src 'none'",
   "form-action 'none'",
-  "frame-ancestors http://127.0.0.1:4174",
+  `frame-ancestors ${HARNESS_ORIGIN}`,
   "script-src 'self' https://s3.tradingview.com",
-  "style-src 'self' 'unsafe-inline'",
+  "style-src 'self'",
   "img-src 'self'",
   "frame-src https://s.tradingview.com",
   "connect-src 'none'",
@@ -39,7 +40,7 @@ const harnessHeaders = Object.freeze({
     "script-src 'self'",
     "style-src 'none'",
     "img-src 'none'",
-    "frame-src http://127.0.0.1:4173",
+    `frame-src ${WRAPPER_ORIGIN}`,
     "connect-src 'none'",
   ].join("; "),
 });

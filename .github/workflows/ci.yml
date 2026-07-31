@@ -44,18 +44,16 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: apps/mini-app/package-lock.json
+          cache-dependency-path: apps/tradingview-wrapper/package-lock.json
       - name: Run offline wrapper checks
         run: |
           npm run lint
           npm run typecheck
           npm run build
           npm test
-      - name: Install browser test dependency from existing Mini App lockfile
-        working-directory: apps/mini-app
+      - name: Install wrapper browser test dependency
         run: npm ci
       - name: Install Chromium for wrapper browser tests
-        working-directory: apps/mini-app
         run: npx playwright install --with-deps chromium
       - name: Run separate-origin wrapper browser tests
         run: npm run e2e

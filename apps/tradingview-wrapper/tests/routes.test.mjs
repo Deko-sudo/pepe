@@ -24,7 +24,7 @@ test("invalid, query, fragment, uppercase, encoded, and traversal route values a
   for (const value of [
     "/chart/btc-usdt/2m", "/chart/btc-usdt", "/chart/btc-usdt/1m/extra", "/chart/BTC-USDT/1m",
     "/chart/btc-usdt/1m?symbol=OANDA:XAUUSD", "/chart/btc-usdt/1m#interval=D",
-    "/chart/btc-usdt%2F1m", "/chart/../btc-usdt/1m",
+    "/chart/btc-usdt%2F1m", "/chart/../btc-usdt/1m", "https://evil.example/chart/btc-usdt/1m",
   ]) assert.equal(parseCanonicalUrl(value), null, value);
 });
 

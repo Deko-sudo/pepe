@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createRequire } from "node:module";
+
 import { once } from "node:events";
 import { resolve } from "node:path";
 import { createStaticServer } from "../src/server.mjs";
 
-const require = createRequire(new URL("../../mini-app/package.json", import.meta.url));
-const { chromium } = require("playwright");
+import { chromium } from "playwright";
 const root = resolve(import.meta.dirname, "..");
 const dist = resolve(root, "dist");
 let wrapperServer;
@@ -17,10 +16,7 @@ test.before(async () => {
   wrapperServer = createStaticServer({ root: dist, port: 4173 });
   harnessServer = createStaticServer({ root: dist, port: 4174, harness: true });
   await Promise.all([once(wrapperServer, "listening"), once(harnessServer, "listening")]);
-  browser = await chromium.launch({
-    ...(process.env.CI ? {} : { executablePath: "/usr/bin/chromium" }),
-    headless: true,
-  });
+  browser = await chromium.launch({ headless: true });
 });
 test.after(async () => {
   await browser?.close();
@@ -33,11 +29,21 @@ test("all 18 routes emit only local document-ready before blocked provider reque
     const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
     await page.route("https://s3.tradingview.com/**", (route) => route.abort());
     await page.goto(`http://127.0.0.1:4174/?test_private_marker=must_not_reach_wrapper`);
+    await page.evaluate(() => {
+      window.rawLifecycleEvents = [];
+      window.rawLifecycleListener = (message) => {
+        const frame = document.querySelector("iframe");
+        if (message.origin === "http://127.0.0.1:4173" && message.source === frame?.contentWindow && message.data?.type === "pepe.tradingview-wrapper.lifecycle") window.rawLifecycleEvents.push(message.data.event);
+      };
+      window.addEventListener("message", window.rawLifecycleListener);
+    });
     await page.evaluate((path) => window.wrapperHarness.mount(path), `/chart/${slug}/${timeframe}`);
     await page.waitForFunction(() => window.wrapperHarness.received.includes("wrapper-document-ready"));
     const events = await page.evaluate(() => window.wrapperHarness.received);
     assert.ok(events.includes("wrapper-document-ready"));
     assert.ok(!events.includes("provider-ready"));
+    assert.ok(!(await page.evaluate(() => window.rawLifecycleEvents)).includes("provider-ready"));
+    await page.evaluate(() => window.removeEventListener("message", window.rawLifecycleListener));
     await page.close();
   }
 });

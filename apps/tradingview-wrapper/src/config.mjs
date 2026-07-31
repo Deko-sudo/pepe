@@ -54,6 +54,7 @@ export function routeConfig(slug, timeframe) {
 
 export function parseCanonicalUrl(value) {
   const url = new URL(value, WRAPPER_ORIGIN);
+  if (url.origin !== WRAPPER_ORIGIN) return null;
   if (url.search || url.hash) return null;
   const match = /^\/chart\/(btc-usdt|eth-usdt|xau-usd)\/(1m|5m|15m|1h|4h|1d)$/.exec(url.pathname);
   return match ? routeConfig(match[1], match[2]) : null;
