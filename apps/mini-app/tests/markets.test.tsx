@@ -14,6 +14,7 @@ const asset = { id: "00000000-0000-4000-8000-000000000001", slug: "btc-usdt", sy
 const quote = { slug: "btc-usdt", price: "12345678901234567890.123456789", bid: null, ask: null, mid: null, market_status: "open", data_status: "fresh", observed_at: "2026-01-01T00:00:00Z", received_at: "2026-01-01T00:00:00Z", age_seconds: 1, stale_after_seconds: 60, provenance: { source_label: "fixture", venue_label: null, market_type: "spot", price_type: "last", delay_class: "realtime" } };
 const candle = { open_time: "2026-01-01T00:00:00Z", close_time: "2026-01-01T00:01:00Z", open: "1.000000000001", high: "3.000000000001", low: "0.500000000001", close: "2.000000000001", source_label: "fixture", venue_label: null, received_at: "2026-01-01T00:01:00Z" };
 const demoCapabilities = { contract_version: "v1", mode: "demo", status: "available", numeric_quotes_available: true, server_candles_available: true, embedded_chart_available: false, analytics_available: false, quote_cards_visible: true, unavailable_reason_code: null };
+const embeddedCapabilities = { contract_version: "v1", mode: "embedded", status: "unavailable", numeric_quotes_available: false, server_candles_available: false, embedded_chart_available: false, analytics_available: false, quote_cards_visible: false, unavailable_reason_code: "embedded_chart_provider_not_configured" };
 
 function renderMarkets() { return render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Markets /></QueryClientProvider>); }
 

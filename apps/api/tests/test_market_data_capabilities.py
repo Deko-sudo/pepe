@@ -8,7 +8,7 @@ from httpx import ASGITransport, AsyncClient
 from pepe_quote_core import MarketDataMode
 
 from app.api.dependencies.session import require_current_session
-from app.core.config import settings
+from app.core.config import Settings, settings
 from app.main import app
 
 
@@ -58,3 +58,68 @@ async def test_capabilities_are_authenticated_and_private_no_store(client: Async
     assert response.json()["contract_version"] == "v1"
     assert response.json()["mode"] == "demo"
     assert response.json()["numeric_quotes_available"] is True
+
+
+def test_embedded_chart_defaults_are_disabled_without_a_provider() -> None:
+    configured = Settings()
+
+    assert configured.embedded_chart_enabled is False
+    assert configured.embedded_chart_provider == "none"
+
+
+def test_embedded_chart_enabled_without_a_provider_is_rejected() -> None:
+    with pytest.raises(ValueError, match="embedded_chart_enabled requires"):
+        Settings(market_data_mode=MarketDataMode.EMBEDDED, embedded_chart_enabled=True)
+
+
+@pytest.mark.asyncio
+async def test_embedded_mode_capabilities_fail_closed_without_a_provider(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "market_data_mode", MarketDataMode.EMBEDDED)
+    monkeypatch.setattr(settings, "embedded_chart_provider", "none")
+    monkeypatch.setattr(settings, "embedded_chart_enabled", False)
+
+    response = await client.get("/api/v1/market-data/capabilities")
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "private, no-store"
+    assert response.json() == {
+        "contract_version": "v1",
+        "mode": "embedded",
+        "status": "unavailable",
+        "numeric_quotes_available": False,
+        "server_candles_available": False,
+        "embedded_chart_available": False,
+        "analytics_available": False,
+        "quote_cards_visible": False,
+        "unavailable_reason_code": "embedded_chart_provider_not_configured",
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("slug", ["btc-usdt", "eth-usdt", "xau-usd"])
+@pytest.mark.parametrize("timeframe", ["1m", "5m", "15m", "1h", "4h", "1d"])
+async def test_embedded_chart_config_validates_canonical_request_but_fails_closed(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch, slug: str, timeframe: str,
+) -> None:
+    monkeypatch.setattr(settings, "market_data_mode", MarketDataMode.EMBEDDED)
+
+    response = await client.get(
+        f"/api/v1/market-data/embedded-chart-config?slug={slug}&timeframe={timeframe}",
+    )
+
+    assert response.status_code == 409
+    assert response.headers["cache-control"] == "private, no-store"
+    assert response.json()["reason_code"] == "embedded_chart_provider_not_configured"
+    assert "provider" not in response.json()
+    assert "iframe_url" not in response.json()
+
+
+@pytest.mark.asyncio
+async def test_embedded_chart_config_rejects_unknown_slug_and_invalid_timeframe(
+    client: AsyncClient,
+) -> None:
+    for query in ("slug=unknown&timeframe=1h", "slug=btc-usdt&timeframe=2h"):
+        response = await client.get(f"/api/v1/market-data/embedded-chart-config?{query}")
+        assert response.status_code == 422

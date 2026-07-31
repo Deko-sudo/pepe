@@ -53,6 +53,7 @@ export const MarketDataCapabilitiesSchema = z.object({
 });
 export type MarketDataCapabilities = z.infer<typeof MarketDataCapabilitiesSchema>;
 
+
 async function request<T>(path: string, schema: z.ZodType<T>): Promise<T> {
   let response: Response;
   try { response = await fetch(`${API_BASE}${path}`, withSessionAuth()); }
@@ -62,6 +63,7 @@ async function request<T>(path: string, schema: z.ZodType<T>): Promise<T> {
 }
 export const getAssets = () => request("/assets?limit=100", CatalogSchema);
 export const getMarketDataCapabilities = () => request("/market-data/capabilities", MarketDataCapabilitiesSchema);
+
 export const getQuotes = (slugs: string[]) => {
   const query = slugs.map((slug) => `slug=${encodeURIComponent(slug)}`).join("&");
   return request(`/assets/quotes?${query}`, QuoteBatchSchema);

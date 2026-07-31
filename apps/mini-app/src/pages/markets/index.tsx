@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getAssets, getCandles, getMarketDataCapabilities, getQuote, type Candle, type Timeframe } from "@/shared/api/market";
 import { useTelegramAuth } from "@/shared/telegram";
+import { EmbeddedMarketChart } from "@/features/market-home/embedded-market-chart";
 
 const timeframes: Timeframe[] = ["1m", "5m", "15m", "1h", "4h", "1d"];
 
@@ -40,6 +41,7 @@ export function Markets() {
   useEffect(() => { if (!selectedSlug && catalog.data?.items[0]) setSelectedSlug(catalog.data.items[0].slug); }, [catalog.data, selectedSlug]);
   const hasSession = authState === "valid";
   const machineReadableMarketData = capabilities.data?.numeric_quotes_available === true && capabilities.data.server_candles_available === true;
+  const embeddedMode = capabilities.data?.mode === "embedded";
   const canLoadMarket = hasSession && Boolean(selectedSlug) && machineReadableMarketData;
   const quote = useQuery({ queryKey: ["quote", selectedSlug], queryFn: () => getQuote(selectedSlug!), enabled: canLoadMarket, refetchInterval: canLoadMarket ? 30_000 : false });
   const candles = useQuery({ queryKey: ["candles", selectedSlug, timeframe], queryFn: () => getCandles(selectedSlug!, timeframe), enabled: canLoadMarket, refetchInterval: canLoadMarket ? 60_000 : false });
@@ -55,7 +57,8 @@ export function Markets() {
     {catalog.data?.items.length === 0 ? <div className="card">Доступные инструменты отсутствуют.</div> : null}
     {catalog.data?.items.length ? <label className="card flex flex-col gap-2 text-sm font-medium">Инструмент<select aria-label="Выбор инструмента" value={selectedSlug} onChange={(event) => setSelectedSlug(event.target.value)} className="touch-target rounded-lg border border-border-subtle bg-transparent px-3">{catalog.data.items.map((asset) => <option key={asset.id} value={asset.slug}>{asset.display_name} ({asset.symbol})</option>)}</select></label> : null}
     {hasSession && capabilities.isError ? <section className="card" role="alert"><h2 className="text-sm font-medium text-text-secondary">Не удалось определить доступность рыночных данных</h2><button className="mt-2 underline" onClick={retry}>Повторить</button></section> : null}
-    {hasSession && !capabilities.isLoading && !capabilities.isError && !machineReadableMarketData ? <section className="card" role="status" aria-live="polite"><h2 className="text-sm font-medium text-text-secondary">Рыночные данные недоступны</h2><p className="mt-2 text-sm">Внешний источник графика ещё не настроен. Числовые котировки и свечи сейчас не отображаются.</p></section> : null}
+    {hasSession && embeddedMode ? <><section className="card"><div className="flex flex-wrap gap-2" role="group" aria-label="Таймфрейм графика">{timeframes.map((value) => <button key={value} aria-pressed={timeframe === value} onClick={() => setTimeframe(value)} className={`touch-target rounded-lg border px-3 text-sm ${timeframe === value ? "border-brand-primary text-brand-primary" : "border-border-subtle"}`}>{value}</button>)}</div></section><EmbeddedMarketChart state="provider-not-configured" /></> : null}
+    {hasSession && !capabilities.isLoading && !capabilities.isError && !machineReadableMarketData && !embeddedMode ? <section className="card" role="status" aria-live="polite"><h2 className="text-sm font-medium text-text-secondary">Рыночные данные недоступны</h2><p className="mt-2 text-sm">Внешний источник графика ещё не настроен. Числовые котировки и свечи сейчас не отображаются.</p></section> : null}
     {canLoadMarket ? <><section className="card" aria-live="polite"><h2 className="text-sm font-medium text-text-secondary">Текущая котировка</h2>{quote.isLoading ? <p className="mt-2">Загрузка…</p> : currentQuote ? <><p className="mt-2 text-3xl font-bold tabular-nums">{currentQuote.price}</p><p className="mt-2 text-xs text-text-secondary">Источник: {currentQuote.provenance.source_label}; наблюдение {new Date(currentQuote.observed_at).toLocaleString()}</p>{currentQuote.data_status === "stale" ? <p className="mt-2 text-sm" role="status">Котировка устарела; ожидается обновление источника.</p> : null}</> : <p className="mt-2 text-sm">{quoteState ?? "Котировка недоступна"}</p>}{quote.isError ? <button className="mt-2 underline" onClick={retry}>Повторить</button> : null}</section>
     <section className="card"><div className="flex flex-wrap gap-2" role="group" aria-label="Таймфрейм">{timeframes.map((value) => <button key={value} aria-pressed={timeframe === value} onClick={() => setTimeframe(value)} className={`touch-target rounded-lg border px-3 text-sm ${timeframe === value ? "border-brand-primary text-brand-primary" : "border-border-subtle"}`}>{value}</button>)}</div><h2 className="mt-4 text-sm font-medium text-text-secondary">Закрытые свечи · {timeframe}</h2>{candles.isLoading ? <p className="mt-4" role="status">Загрузка истории…</p> : candles.isError ? <p className="mt-4" role="alert">Не удалось загрузить свечи. <button className="underline" onClick={retry}>Повторить</button></p> : <CandleChart candles={candles.data?.items ?? []} />}</section></> : null}
   </div>;

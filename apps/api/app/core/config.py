@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     quote_fake_provider_enabled: bool = False
     candle_fake_provider_enabled: bool = False
     market_data_mode: MarketDataMode = MarketDataMode.DEMO
+    embedded_chart_provider: Literal["none"] = "none"
+    embedded_chart_enabled: bool = False
     quote_source_label: str = _synthetic_quote_source_label
     quote_venue_label: str = _synthetic_quote_venue_label
     quote_crypto_stale_after_seconds: int = 60
@@ -94,6 +96,13 @@ class Settings(BaseSettings):
             quote_fake_provider_enabled=self.quote_fake_provider_enabled,
             candle_fake_provider_enabled=self.candle_fake_provider_enabled,
         )
+        if self.embedded_chart_enabled:
+            raise ValueError("embedded_chart_enabled requires an approved embedded chart provider")
+        if self.market_data_mode is not MarketDataMode.EMBEDDED and (
+            self.embedded_chart_enabled
+            or self.embedded_chart_provider != "none"
+        ):
+            raise ValueError("embedded chart configuration is only valid in embedded mode")
         if self.environment == "production" and (
             not self.quote_source_label.strip()
             or self.quote_source_label == self._synthetic_quote_source_label
