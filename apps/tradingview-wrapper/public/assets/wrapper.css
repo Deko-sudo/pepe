@@ -1,0 +1,11 @@
+:root { color-scheme: dark; background: #0d1117; color: #e6edf3; font-family: system-ui, sans-serif; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #0d1117; }
+.wrapper { max-width: 1120px; min-height: 100vh; margin: 0 auto; padding: 16px; }
+.banner { margin: 0 0 16px; border: 1px solid #8b6a1d; background: #2d2411; padding: 10px 12px; color: #f2d47b; font-weight: 700; }
+h1 { margin: 0; font-size: clamp(1.25rem, 5vw, 2rem); }
+p { line-height: 1.45; }
+.chart-shell { min-height: 420px; border: 1px solid #30363d; background: #161b22; padding: 12px; }
+.tradingview-widget-container { min-height: 380px; width: 100%; }
+.limitation { color: #a8b3c0; font-size: .9rem; }
+@media (max-width: 480px) { .wrapper { padding: 10px; } .chart-shell { min-height: 360px; } .tradingview-widget-container { min-height: 320px; } }

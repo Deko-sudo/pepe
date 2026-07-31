@@ -1,6 +1,6 @@
 # Isolated TradingView wrapper architecture (PR W1)
 
-> **Decision status:** ARCHITECTURE READY — AWAITS OWNER MERGE APPROVAL. This is a documentation-only architecture decision. It approves no production integration, contractual use, hosting, configuration, CSP, or provider activation.
+> **Decision status:** ARCHITECTURE MERGED. W2 static technical-validation evidence is delivered in a separate PR and awaits owner merge approval. Neither document approves production integration, contractual use, hosting, configuration, CSP, or provider activation.
 > **Research date:** 2026-07-31. Official public sources below were accessed on that date from an unauthenticated environment.
 
 ## 1. Decision status
@@ -183,7 +183,7 @@ Future rollback sets the approved capability control to unavailable/disabled, co
 ## 27. Planned implementation pull requests
 
 1. **W1 — Wrapper architecture qualification:** this documentation-only PR. Stop before merge.
-2. **W2 — Static isolated wrapper foundation:** static canonical routes, official script only inside wrapper, mappings/intervals, local/test hosting, wrapper headers/CSP, concrete-origin lifecycle-signaling sandbox validation, script-change detection, and revalidated subresource inventory; no Mini App integration or production DNS. Stop before merge.
+2. **W2 — Static isolated wrapper foundation:** delivered by the current focused PR; see [`apps/tradingview-wrapper/README.md`](../apps/tradingview-wrapper/README.md) and [W2 validation evidence](tradingview-wrapper-w2-validation.md). It remains PR-only until owner merge approval; no Mini App integration or production DNS. Stop before merge.
 3. **W3 — Backend wrapper configuration contract:** provider enum, wrapper-origin configuration, allowlisted routes, successful versioned config response, startup validation, no arbitrary URL/symbol. Stop before merge.
 4. **W4 — Mini App wrapper integration:** dashboard and `/markets`, `referrerpolicy="no-referrer"`, validated wrapper-lifecycle handling, timeout/retry/fallback, capability revalidation, no quote/candle requests or DEMO fallback. Stop before merge.
 5. **W5 — CSP, blocking, and rollback hardening:** exact parent `frame-src`, parent response referrer policy, sandbox, effective-header tests, observed script-change/subresource revalidation and explicit rollback decision, observable/unobservable failure handling, active-client kill switch, rollback exercise, privacy-safe telemetry. Stop before merge.

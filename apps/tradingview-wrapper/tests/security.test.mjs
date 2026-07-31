@@ -1,0 +1,60 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { WRAPPER_CSP } from "../src/server.mjs";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+test("wrapper CSP is exact, explicit, and excludes unsafe provider sources", () => {
+  const directives = Object.fromEntries(WRAPPER_CSP.split("; ").map((directive) => {
+    const [name, ...sources] = directive.split(" ");
+    return [name, sources];
+  }));
+  assert.deepEqual(directives, {
+    "default-src": ["'none'"], "base-uri": ["'none'"], "object-src": ["'none'"], "form-action": ["'none'"],
+    "frame-ancestors": ["http://127.0.0.1:4174"], "script-src": ["'self'", "https://s3.tradingview.com"],
+    "style-src": ["'self'"], "img-src": ["'self'"], "frame-src": ["https://s.tradingview.com"],
+    "connect-src": ["'none'"], "font-src": ["'none'"], "media-src": ["'none'"], "worker-src": ["'none'"], "manifest-src": ["'none'"],
+  });
+  for (const forbidden of ["*", "unsafe-eval", "'unsafe-inline'"]) assert.ok(!WRAPPER_CSP.includes(forbidden), forbidden);
+});
+
+test("provider metadata records observed—not pinned—script change evidence", async () => {
+  const metadata = JSON.parse(await readFile(path.join(root, "provider/tradingview-script.json"), "utf8"));
+  assert.deepEqual(Object.keys(metadata).sort(), ["accessDate", "lastValidationDate", "notes", "observedFinalUrl", "observedSha256", "officialDocumentationTitle", "officialDocumentationUrl", "officialUrl", "retrievalResult", "status"]);
+  assert.equal(metadata.officialUrl, "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js");
+  assert.equal(metadata.observedFinalUrl, metadata.officialUrl);
+  assert.match(metadata.observedSha256, /^[a-f0-9]{64}$/);
+  assert.equal(metadata.status, "observed-not-pinned");
+  assert.match(metadata.accessDate, /^\d{4}-\d{2}-\d{2}$/);
+  assert.match(metadata.lastValidationDate, /^\d{4}-\d{2}-\d{2}$/);
+});
+
+test("provider-check keeps mutable-provider validation manual and fails closed", async () => {
+  const source = await readFile(path.join(root, "src/provider-check.mjs"), "utf8");
+  for (const policy of ["https.get", "redirects >= 3", "Provider redirect has no Location header", "Rejected non-HTTPS redirect", "Unexpected provider status", "currentUrl !== metadata.observedFinalUrl || hash !== metadata.observedSha256"]) assert.ok(source.includes(policy), policy);
+  assert.doesNotMatch(source, /writeFile|rename|unlink/);
+});
+
+test("origin inventory remains metadata-only and rejects HTTP and wildcard approval", async () => {
+  const inventory = JSON.parse(await readFile(path.join(root, "provider/observed-origins.json"), "utf8"));
+  assert.equal(inventory.httpRequestsObserved, false);
+  assert.equal(inventory.mixedContentObserved, false);
+  assert.equal(inventory.wildcardHostsNecessary, false);
+  assert.deepEqual(inventory.nestedFrameOrigins, ["https://s.tradingview.com"]);
+  for (const origin of inventory.additionalObservedHttpsOrigins) {
+    const url = new URL(origin);
+    assert.equal(url.protocol, "https:");
+    assert.ok(!url.hostname.includes("*"));
+    assert.equal(url.origin, origin);
+  }
+});
+
+test("Nginx serves extensionless canonical documents as HTML without dropping inherited headers", async () => {
+  const nginx = await readFile(path.join(root, "nginx.conf"), "utf8");
+  assert.match(nginx, /location ~ \^\/chart[\s\S]*?default_type text\/html;[\s\S]*?try_files \$uri =404;/);
+  assert.match(nginx, /add_header Content-Security-Policy[\s\S]*?add_header Cache-Control "no-store" always;/);
+  assert.doesNotMatch(nginx, /location ~ \^\/chart[\s\S]*?add_header Cache-Control/);
+});

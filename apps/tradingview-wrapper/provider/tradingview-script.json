@@ -1,0 +1,12 @@
+{
+  "officialUrl": "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js",
+  "officialDocumentationUrl": "https://www.tradingview.com/widget-docs/widgets/charts/advanced-chart/",
+  "officialDocumentationTitle": "Advanced Chart: Widget Code & Settings — TradingView",
+  "accessDate": "2026-07-31",
+  "lastValidationDate": "2026-07-31",
+  "observedFinalUrl": "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js",
+  "observedSha256": "e49b74c1748b58e5d3bf0e42c1ce6d70f73dce57011a50d4fb1b62db450a8678",
+  "retrievalResult": "HTTP 200, no redirect observed",
+  "status": "observed-not-pinned",
+  "notes": "A changed hash requires explicit review and complete observed subresource inventory revalidation. This record is change detection, not an immutable pin or production approval."
+}

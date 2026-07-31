@@ -1,0 +1,19 @@
+{
+  "environment": "local/test technical validation only",
+  "accessDate": "2026-07-31",
+  "wrapperOrigin": "http://127.0.0.1:4173",
+  "parentHarnessOrigin": "http://127.0.0.1:4174",
+  "officialScriptOrigin": "https://s3.tradingview.com",
+  "finalScriptOrigin": "https://s3.tradingview.com",
+  "nestedFrameOrigins": ["https://s.tradingview.com"],
+  "additionalObservedHttpsOrigins": [],
+  "requestCategories": {
+    "officialScript": ["https://s3.tradingview.com"],
+    "nestedProviderFrame": ["https://s.tradingview.com"]
+  },
+  "httpRequestsObserved": false,
+  "mixedContentObserved": false,
+  "wildcardHostsNecessary": false,
+  "originVariance": "No variance observed in controlled W2 local test runs; W5 must revalidate after every observed script-hash change and before production CSP approval.",
+  "limitations": "This is an origin/category inventory only. It intentionally stores no market values, DOM content, cookies, identifiers, authorization data, screenshots, or provider payloads."
+}
