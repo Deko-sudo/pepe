@@ -128,7 +128,7 @@ Publish the selected provider's dated official documentation/terms evidence, att
 
 ## 19. Planned pull requests
 
-1. **PR C1 — Provider research and selection:** documentation-only shortlist, official terms/rights, exact mappings/domains/cost, owner selection. Stop before merge.
+1. **PR C1 — Provider research and selection:** **completed with no qualified single provider**; see [direct-iframe qualification results](direct-iframe-provider-selection.md). The current conclusion preserves the fail-closed foundation and requires a separate owner decision before renewed research. Stop before merge.
 2. **PR C2 — Provider-specific backend contract:** enum/validation, allowlisted mappings, successful config response, tests; no frontend iframe. Stop before merge.
 3. **PR C3 — Frontend direct iframe integration:** dashboard and `/markets`, lifecycle/attribution/timeout/retry/fallback, no quote/candle requests. Stop before merge.
 4. **PR C4 — CSP and provider-blocking hardening:** exact CSP/domain allowlist, SPA-header verification, outage/security tests. Stop before merge.
