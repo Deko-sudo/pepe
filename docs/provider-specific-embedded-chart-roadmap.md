@@ -32,21 +32,17 @@ The merged foundation is server-authoritative and fail-closed:
 
 This roadmap does not authorize a provider choice, iframe/script/domain, credential, account, provider proxy, raw quote/candle extraction, scraping, iframe DOM access, `postMessage` market parsing, persistence, server analytics, synthetic fallback, Stage 9, or a change to CI in this PR.
 
-## 5. Provider qualification gate
+## 5. Qualification gates
 
-PR C1 researches a bounded shortlist using current official primary sources only. A candidate qualifies only when the evidence record includes official documentation URL and access date, terms summary, attribution requirement, exact domains, instrument identifiers, interval mapping, cost, known limitations, regional caveats, and Telegram WebView compatibility assumptions.
+### Historical C1 direct-iframe gate
 
-Required qualifications:
+PR C1 used a bounded official-primary-source shortlist and required a direct HTTPS iframe, exact domains, exact instruments/intervals, public-display rights, attribution, cost/limitations, regional caveats, and Telegram WebView assumptions. It found no qualifying single provider. Those criteria and findings remain historical evidence in [the C1 record](direct-iframe-provider-selection.md); they are not a gate the approved wrapper path must satisfy.
 
-- officially documented, stable direct iframe integration; no undocumented URL construction;
-- no provider JavaScript in Pepe's top-level document;
-- no account/API key if possible, free or very-low-cost initial use, and public display permitted with visible required attribution;
-- no raw-data extraction, server proxy, resale, redistribution, or client-exposed credential;
-- responsive dark-theme display and controls compatible with Pepe;
-- exact support for the required instruments/timeframes, or explicit owner-approved unavailable behavior;
-- official rights/terms suitable for a free informational Telegram Mini App.
+### W1/W2 isolated-wrapper gate
 
-The selection record must state why a split-provider design is or is not acceptable. It must not silently substitute an instrument: BTC/USDT is not BTC/USD; ETH/USDT is not ETH/USD; XAU/USD is not futures, tokenized gold, XAU/USDT, another metal, or an undisclosed derivative. Crypto venue, XAU source semantics, and delay (`real-time`, `delayed`, or `unknown`) must be visible.
+The owner-approved wrapper path qualifies only when the evidence record includes current official TradingView script documentation and access date; terms/public-display assessment; attribution; canonical wrapper-route allowlisting; proposed symbol/interval mappings; instrument, venue, delay, and XAU semantics disclosures; exact observed wrapper subresource/frame origins; restrictive wrapper and parent CSP; validated sandbox; parent `referrerpolicy="no-referrer"`; fixed wrapper-owned lifecycle signals with documented readiness limits; regional caveats; and Telegram WebView validation assumptions. The official script may load only inside the separate wrapper origin, never Pepe's top-level document; no undocumented URL construction, raw-data extraction, proxy, resale, redistribution, client credential, or market-message parsing is permitted.
+
+The wrapper gate does not silently substitute an instrument: BTC/USDT is not BTC/USD; ETH/USDT is not ETH/USD; XAU/USD is not futures, tokenized gold, XAU/USDT, another metal, or an undisclosed derivative. Crypto venue, XAU source semantics, and delay (`real-time`, `delayed`, or `unknown`) must be visible. Mandatory written TradingView confirmation remains a production gate under the architecture's current terms assessment.
 
 ## 6. Direct iframe technical requirements
 

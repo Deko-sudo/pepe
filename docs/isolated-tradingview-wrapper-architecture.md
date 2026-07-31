@@ -34,7 +34,7 @@ This PR creates no wrapper, iframe, provider enum, mapping, CSP, production conf
 
 `https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js`
 
-The generated configuration includes `symbol`, `interval`, `theme`, `locale`, `timezone`, and `autosize`; the displayed sample uses `interval: "D"`, `symbol: "NASDAQ:AAPL"`, `theme: "dark"`, and `autosize: true`. This is the **only approved future mechanism**: a static wrapper document loads that exact documented script and allows the script to create its own nested frame.
+The generated configuration includes `symbol`, `interval`, `theme`, `locale`, `timezone`, and `autosize`; the displayed sample uses `interval: "D"`, `symbol: "NASDAQ:AAPL"`, `theme: "dark"`, and `autosize: true`. This is the **only approved future mechanism**: a static wrapper document loads that exact documented script and allows the script to create its own nested frame. Before production activation, W2/W5 must record an approved script-change detection approach, revalidate the complete subresource inventory when the documented script changes, and record an explicit keep-disabled/rollback decision before any reactivation. Host allowlisting alone does not establish that unchanged script content remains served.
 
 **Rejected:** manually constructed TradingView iframe URLs, `tradingview-widget.com` URL construction, undocumented fragments, client-selected script URLs/symbols/intervals, provider script in the Pepe top-level document, or raw-data/message/DOM access.
 
@@ -108,7 +108,7 @@ The future parent policy may add only `frame-src https://<approved-wrapper-origi
 The starting PoC candidate `allow-scripts allow-same-origin allow-popups` is **not approved**. W2 must test every token against the documented widget and report the minimum viable set.
 
 - `allow-scripts`: expected necessary for the wrapper and official widget script; requires validation.
-- `allow-same-origin`: not automatically approved. If needed, separate-origin Origin B prevents it from accessing Origin A, but it retains Origin B's own origin and must be explicitly accepted by security review.
+- `allow-same-origin`: not automatically approved for a generic wrapper. For the approved `postMessage` lifecycle-signaling path, it is required so Origin B retains a concrete origin and Pepe can enforce exact `event.origin` validation; without it, opaque-origin `null` events must be rejected. Separate-origin Origin B still cannot access Origin A, but retaining Origin B's own origin must be explicitly accepted by security review. An opaque-origin alternative is allowed only after a separately documented and security-reviewed signal design replaces this path.
 - `allow-popups`: not automatically approved. It may be considered only for visible, user-initiated attribution/symbol navigation; `allow-popups-to-escape-sandbox` remains prohibited.
 - `allow-forms`, `allow-modals`, `allow-downloads`, `allow-presentation`, `allow-top-navigation`, and `allow-top-navigation-by-user-activation`: prohibited unless a separately documented requirement and owner approval exists.
 
@@ -152,7 +152,7 @@ Allowed future privacy-safe events: wrapper configuration requested, iframe moun
 
 ## 21. Attribution and fallback navigation
 
-**Verified fact:** generated Advanced Chart markup includes an attribution link and `by TradingView`. W2 must preserve the current generated attribution/branding and confirm it remains visible at phone/desktop sizes. The wrapper must not crop, hide, overlay, or remove it. Any symbol or fallback navigation must be user initiated, non-sensitive, and must not top-navigate Pepe.
+**Verified fact:** generated Advanced Chart markup includes an attribution link and `by TradingView`. W2 must preserve the current generated attribution/branding and confirm it remains visible at phone/desktop sizes. The wrapper must not crop, hide, overlay, or remove it. Any symbol or fallback navigation must be user-initiated, non-sensitive, and must not top-navigate Pepe.
 
 ## 22. Terms and public-display assessment
 
@@ -183,16 +183,16 @@ Future rollback sets the approved capability control to unavailable/disabled, co
 ## 27. Planned implementation pull requests
 
 1. **W1 — Wrapper architecture qualification:** this documentation-only PR. Stop before merge.
-2. **W2 — Static isolated wrapper foundation:** static canonical routes, official script only inside wrapper, mappings/intervals, local/test hosting, wrapper headers/CSP, no Mini App integration or production DNS. Stop before merge.
+2. **W2 — Static isolated wrapper foundation:** static canonical routes, official script only inside wrapper, mappings/intervals, local/test hosting, wrapper headers/CSP, concrete-origin lifecycle-signaling sandbox validation, script-change detection, and revalidated subresource inventory; no Mini App integration or production DNS. Stop before merge.
 3. **W3 — Backend wrapper configuration contract:** provider enum, wrapper-origin configuration, allowlisted routes, successful versioned config response, startup validation, no arbitrary URL/symbol. Stop before merge.
 4. **W4 — Mini App wrapper integration:** dashboard and `/markets`, `referrerpolicy="no-referrer"`, validated wrapper-lifecycle handling, timeout/retry/fallback, capability revalidation, no quote/candle requests or DEMO fallback. Stop before merge.
-5. **W5 — CSP, blocking, and rollback hardening:** exact parent `frame-src`, parent response referrer policy, sandbox, effective-header tests, observable/unobservable failure handling, active-client kill switch, rollback exercise, privacy-safe telemetry. Stop before merge.
+5. **W5 — CSP, blocking, and rollback hardening:** exact parent `frame-src`, parent response referrer policy, sandbox, effective-header tests, observed script-change/subresource revalidation and explicit rollback decision, observable/unobservable failure handling, active-client kill switch, rollback exercise, privacy-safe telemetry. Stop before merge.
 6. **W6 — CI main-push hardening:** CI on PR and `main` push, exact-main evidence, remediation procedure; merge before production activation. Stop before merge.
 7. **W7 — Telegram validation and production activation:** mandatory written TradingView confirmation for intended public display; dedicated production wrapper origin, DNS/TLS, Android/Desktop smoke, production configuration, kill-switch exercise, and launch checklist. Stop before merge.
 
 ## 28. Acceptance criteria
 
-Before any production activation: W1 is merged; official script remains documented and runs only inside the separate-origin wrapper, never Pepe's top-level document; W2 proves canonical route allowlisting and HTTPS behavior; approved exact mappings/intervals and accepted XAU semantics; mandatory written TradingView confirmation for intended public display; full domain/subresource inventory; narrow wrapper CSP and parent frame-only CSP; parent `referrerpolicy="no-referrer"` and equivalent restrictive parent response policy where appropriate; accepted sandbox; validated wrapper lifecycle signaling with documented readiness limits; visible attribution; no identity flow or extraction; timeout/block/rollback/active invalidation evidence; W6 merged with green exact-main CI; W7 Android/Desktop evidence; and Stage 9 unchanged.
+Before any production activation: W1 is merged; official script remains documented and runs only inside the separate-origin wrapper, never Pepe's top-level document; W2 proves canonical route allowlisting and HTTPS behavior; approved exact mappings/intervals and accepted XAU semantics; mandatory written TradingView confirmation for intended public display; full domain/subresource inventory; narrow wrapper CSP and parent frame-only CSP; parent `referrerpolicy="no-referrer"` and equivalent restrictive parent response policy where appropriate; accepted sandbox including a concrete-origin lifecycle-signaling path; approved script-change detection with revalidated subresource inventory and explicit keep-disabled/rollback decision; validated wrapper lifecycle signaling with documented readiness limits; visible attribution; no identity flow or extraction; timeout/block/rollback/active invalidation evidence; W6 merged with green exact-main CI; W7 Android/Desktop evidence; and Stage 9 unchanged.
 
 ## 29. Unresolved owner decisions
 
