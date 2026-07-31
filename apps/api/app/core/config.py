@@ -1,6 +1,7 @@
 from typing import Literal
 from urllib.parse import urlsplit
 
+from pepe_quote_core import MarketDataMode, validate_market_data_policy
 from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings
 
@@ -23,6 +24,8 @@ class Settings(BaseSettings):
     quote_cache_namespace: str = "pepe:quotes:v1"
     quote_cache_ttl_seconds: int = 60
     quote_fake_provider_enabled: bool = False
+    candle_fake_provider_enabled: bool = False
+    market_data_mode: MarketDataMode = MarketDataMode.DEMO
     quote_source_label: str = _synthetic_quote_source_label
     quote_venue_label: str = _synthetic_quote_venue_label
     quote_crypto_stale_after_seconds: int = 60
@@ -85,8 +88,12 @@ class Settings(BaseSettings):
             )
         if self.environment == "production" and not self.session_origins:
             raise ValueError("session_allowed_origins must not be empty in production")
-        if self.environment == "production" and self.quote_fake_provider_enabled:
-            raise ValueError("quote_fake_provider_enabled must be false in production")
+        validate_market_data_policy(
+            environment=self.environment,
+            mode=self.market_data_mode,
+            quote_fake_provider_enabled=self.quote_fake_provider_enabled,
+            candle_fake_provider_enabled=self.candle_fake_provider_enabled,
+        )
         if self.environment == "production" and (
             not self.quote_source_label.strip()
             or self.quote_source_label == self._synthetic_quote_source_label

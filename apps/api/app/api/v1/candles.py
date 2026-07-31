@@ -5,10 +5,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
-from pepe_quote_core import CandleTimeframe
+from pepe_quote_core import CandleTimeframe, has_machine_readable_market_data
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.session import require_current_session
+from app.core.config import settings
+from app.core.market_data import unavailable_market_data_error
 from app.db.session import get_db
 from app.modules.market_data.candles import HistoricalCandleService
 from app.modules.sessions.service import AuthenticatedSession
@@ -28,6 +30,12 @@ async def get_candles(
     to_time: Annotated[datetime | None, Query(alias="to")] = None,
     limit: Annotated[int, Query(ge=1, le=1000)] = 500,
 ) -> JSONResponse:
+    if not has_machine_readable_market_data(settings.market_data_mode):
+        return JSONResponse(
+            status_code=409,
+            content=unavailable_market_data_error(settings.market_data_mode, "candles"),
+            headers=_CACHE_CONTROL,
+        )
     if (from_time is not None and from_time.tzinfo is None) or (
         to_time is not None and to_time.tzinfo is None
     ):

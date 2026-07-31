@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi import HTTPException
+from pepe_quote_core import MarketDataMode
 from starlette.requests import Request
 from starlette.responses import Response
 
@@ -105,6 +106,7 @@ def test_settings_rejects_insecure_production_environment_variants(environment: 
 def test_settings_accepts_secure_normalized_production_environment() -> None:
     settings = Settings(
         environment=" Production ",
+        market_data_mode=MarketDataMode.UNAVAILABLE,
         session_cookie_secure=True,
         cors_allowed_origins="https://mini.pepe.example",
         session_allowed_origins="https://mini.pepe.example",
@@ -131,6 +133,7 @@ def test_settings_rejects_placeholder_quote_labels_in_production(
     with pytest.raises(ValueError, match="production quote labels"):
         Settings(
             environment="production",
+            market_data_mode=MarketDataMode.UNAVAILABLE,
             session_cookie_secure=True,
             cors_allowed_origins="https://mini.pepe.example",
             session_allowed_origins="https://mini.pepe.example",

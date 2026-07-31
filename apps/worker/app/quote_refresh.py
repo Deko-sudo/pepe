@@ -9,6 +9,7 @@ import asyncpg
 from pepe_quote_core import (
     CurrentQuoteCacheEntry,
     FakeQuoteProvider,
+    MarketDataMode,
     NormalizedQuote,
     QuoteRequest,
     encode_current_quote_cache,
@@ -190,6 +191,8 @@ class RedisQuoteCache:
 
 async def refresh_fake_quotes() -> dict[str, int | str]:
     """Compose worker adapters around the dependency-injected refresh service."""
+    if worker_settings.market_data_mode is not MarketDataMode.DEMO:
+        raise RuntimeError("synthetic quote refresh is forbidden outside market_data_mode=demo")
     if not worker_settings.quote_fake_provider_enabled:
         return {"status": "disabled", "refreshed": 0}
 

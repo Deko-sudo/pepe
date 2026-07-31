@@ -1,6 +1,20 @@
 from celery import Celery
+from pepe_quote_core import MarketDataMode
 
 from app.config import worker_settings
+
+_beat_schedule: dict[str, dict[str, object]] = {}
+if worker_settings.market_data_mode is MarketDataMode.DEMO:
+    _beat_schedule = {
+        "refresh-fake-current-quotes": {
+            "task": "quote.refresh",
+            "schedule": worker_settings.quote_scheduler_interval_seconds,
+        },
+        "sync-fake-historical-candles": {
+            "task": "candles.sync",
+            "schedule": worker_settings.candle_scheduler_interval_seconds,
+        },
+    }
 
 celery_app = Celery(
     "pepe_worker",
@@ -22,16 +36,7 @@ celery_app.conf.update(
         "quote.refresh": {"queue": worker_settings.quote_queue_name},
         "candles.sync": {"queue": worker_settings.candle_queue_name},
     },
-    beat_schedule={
-        "refresh-fake-current-quotes": {
-            "task": "quote.refresh",
-            "schedule": worker_settings.quote_scheduler_interval_seconds,
-        },
-        "sync-fake-historical-candles": {
-            "task": "candles.sync",
-            "schedule": worker_settings.candle_scheduler_interval_seconds,
-        },
-    },
+    beat_schedule=_beat_schedule,
 )
 
 celery_app.autodiscover_tasks(["app"])

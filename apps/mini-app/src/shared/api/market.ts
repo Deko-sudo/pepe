@@ -40,6 +40,19 @@ export const CandleSchema = z.object({
 export type Candle = z.infer<typeof CandleSchema>;
 export const CandlesSchema = z.object({ timeframe: TimeframeSchema, items: z.array(CandleSchema) });
 
+export const MarketDataCapabilitiesSchema = z.object({
+  contract_version: z.literal("v1"),
+  mode: z.enum(["demo", "embedded", "live", "unavailable"]),
+  status: z.enum(["available", "unavailable"]),
+  numeric_quotes_available: z.boolean(),
+  server_candles_available: z.boolean(),
+  embedded_chart_available: z.boolean(),
+  analytics_available: z.boolean(),
+  quote_cards_visible: z.boolean(),
+  unavailable_reason_code: z.string().nullable(),
+});
+export type MarketDataCapabilities = z.infer<typeof MarketDataCapabilitiesSchema>;
+
 async function request<T>(path: string, schema: z.ZodType<T>): Promise<T> {
   let response: Response;
   try { response = await fetch(`${API_BASE}${path}`, withSessionAuth()); }
@@ -48,6 +61,7 @@ async function request<T>(path: string, schema: z.ZodType<T>): Promise<T> {
   return schema.parse(await response.json());
 }
 export const getAssets = () => request("/assets?limit=100", CatalogSchema);
+export const getMarketDataCapabilities = () => request("/market-data/capabilities", MarketDataCapabilitiesSchema);
 export const getQuotes = (slugs: string[]) => {
   const query = slugs.map((slug) => `slug=${encodeURIComponent(slug)}`).join("&");
   return request(`/assets/quotes?${query}`, QuoteBatchSchema);
