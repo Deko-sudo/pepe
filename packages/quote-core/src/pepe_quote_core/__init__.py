@@ -21,6 +21,11 @@ from .fake import (
     HistoricalCandleProvider,
     QuoteProvider,
 )
+from .market_mode import (
+    MarketDataMode,
+    has_machine_readable_market_data,
+    validate_market_data_policy,
+)
 from .types import (
     DataStatus,
     DelayClass,
@@ -48,6 +53,7 @@ __all__ = [
     "FakeQuoteProvider",
     "FreshnessPolicy",
     "HistoricalCandleProvider",
+    "MarketDataMode",
     "MarketStatus",
     "MarketType",
     "NormalizedCandle",
@@ -64,8 +70,10 @@ __all__ = [
     "decode_current_quote_cache",
     "detect_gaps",
     "encode_current_quote_cache",
+    "has_machine_readable_market_data",
     "incremental_from",
     "latest_closed_open_time",
     "parse_decimal",
     "timeframe_duration",
+    "validate_market_data_policy",
 ]

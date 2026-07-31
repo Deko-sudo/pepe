@@ -16,6 +16,7 @@ import { Link, useLocation } from "react-router-dom";
 import {
   getAssets,
   getCandles,
+  getMarketDataCapabilities,
   getQuotes,
   TIMEFRAMES,
   type Asset,
@@ -339,6 +340,8 @@ export function MarketHome() {
   const location = useLocation();
   const { state, telegramInitState, diagnosticCode } = useTelegramAuth();
   const canLoadMarket = state === "valid";
+  const capabilities = useQuery({ queryKey: ["market-data-capabilities"], queryFn: getMarketDataCapabilities, enabled: canLoadMarket, retry: false });
+  const hasMachineReadableMarketData = capabilities.data?.numeric_quotes_available === true && capabilities.data.server_candles_available === true;
   const [selectedSlug, setSelectedSlug] = useState("");
   const [timeframe, setTimeframe] = useState<Timeframe>("1h");
   const [freshnessClock, setFreshnessClock] = useState(() => Date.now());
@@ -374,7 +377,7 @@ export function MarketHome() {
   const quotes = useQuery({
     queryKey: ["home-quotes", slugs],
     queryFn: () => getQuotes(slugs),
-    enabled: canLoadMarket && slugs.length > 0,
+    enabled: canLoadMarket && hasMachineReadableMarketData && slugs.length > 0,
     refetchInterval: 60_000,
     refetchOnWindowFocus: "always",
     refetchOnReconnect: "always",
@@ -396,7 +399,7 @@ export function MarketHome() {
       }
       return { ...response, items: normalizeCandles(response.items) };
     },
-    enabled: canLoadMarket && Boolean(activeSlug),
+    enabled: canLoadMarket && hasMachineReadableMarketData && Boolean(activeSlug),
     refetchOnWindowFocus: "always",
     refetchOnReconnect: "always",
   });
@@ -414,6 +417,13 @@ export function MarketHome() {
         )}
       />
     );
+  }
+  if (capabilities.isLoading) return <DashboardSkeleton />;
+  if (capabilities.isError) {
+    return <BlockingState title="Не удалось определить доступность рыночных данных" message="Проверьте подключение и повторите запрос." retry={() => void capabilities.refetch()} />;
+  }
+  if (!hasMachineReadableMarketData) {
+    return <BlockingState title="Рыночные данные недоступны" message="Внешний источник графика ещё не настроен. Числовые котировки и свечи сейчас не отображаются." />;
   }
   if (catalog.isLoading) return <DashboardSkeleton />;
   if (catalog.isError) {

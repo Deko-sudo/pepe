@@ -13,6 +13,7 @@ import { ApiError } from "../src/shared/api";
 
 const api = vi.hoisted(() => ({
   getAssets: vi.fn(),
+  getMarketDataCapabilities: vi.fn(),
   getQuotes: vi.fn(),
   getCandles: vi.fn(),
 }));
@@ -101,6 +102,7 @@ beforeEach(() => {
   auth.state = "valid";
   auth.telegramInitState = "TG_READY";
   auth.diagnosticCode = null;
+  api.getMarketDataCapabilities.mockReset().mockResolvedValue({ contract_version: "v1", mode: "demo", status: "available", numeric_quotes_available: true, server_candles_available: true, embedded_chart_available: false, analytics_available: false, quote_cards_visible: true, unavailable_reason_code: null });
   api.getAssets.mockReset().mockResolvedValue({ items: assets, next_cursor: null });
   api.getQuotes.mockReset().mockResolvedValue({
     items: [

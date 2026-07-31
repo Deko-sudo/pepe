@@ -6,7 +6,12 @@ from datetime import UTC, datetime
 from typing import Any, cast
 
 import asyncpg
-from pepe_quote_core import CandleTimeframe, FakeHistoricalCandleProvider, NormalizedCandle
+from pepe_quote_core import (
+    CandleTimeframe,
+    FakeHistoricalCandleProvider,
+    MarketDataMode,
+    NormalizedCandle,
+)
 from redis import asyncio as redis_asyncio
 
 from app.candle_redis import CandleRedisLeaseStore, RedisClient
@@ -156,6 +161,10 @@ async def sync_candles(
 
 async def sync_fake_candles() -> dict[str, int | str]:
     """Run the explicitly enabled local-development fake provider."""
+    if worker_settings.market_data_mode is not MarketDataMode.DEMO:
+        raise RuntimeError(
+            "synthetic candle synchronization is forbidden outside market_data_mode=demo",
+        )
     if not worker_settings.candle_fake_provider_enabled:
         return {"status": "disabled", "synced": 0}
     now = datetime.now(UTC)

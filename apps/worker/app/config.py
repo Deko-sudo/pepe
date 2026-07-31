@@ -1,8 +1,11 @@
+from pepe_quote_core import MarketDataMode, validate_market_data_policy
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
 class WorkerSettings(BaseSettings):
+    environment: str = "development"
+    market_data_mode: MarketDataMode = MarketDataMode.DEMO
     redis_url: str = "redis://localhost:6379/0"
     quote_cache_url: str = "redis://localhost:6379/1"
     quote_cache_namespace: str = "pepe:quotes:v1"
@@ -19,6 +22,14 @@ class WorkerSettings(BaseSettings):
     log_level: str = "INFO"
 
     model_config = {"env_file": ".env", "extra": "ignore"}
+
+    def model_post_init(self, __context: object) -> None:
+        validate_market_data_policy(
+            environment=self.environment,
+            mode=self.market_data_mode,
+            quote_fake_provider_enabled=self.quote_fake_provider_enabled,
+            candle_fake_provider_enabled=self.candle_fake_provider_enabled,
+        )
 
 
 worker_settings = WorkerSettings()
