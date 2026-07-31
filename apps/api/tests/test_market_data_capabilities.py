@@ -9,6 +9,7 @@ from pepe_quote_core import MarketDataMode
 
 from app.api.dependencies.session import require_current_session
 from app.core.config import Settings, settings
+from app.core.embedded_chart import EmbeddedChartProvider, canonical_wrapper_origin
 from app.main import app
 
 
@@ -20,7 +21,8 @@ async def client() -> AsyncIterator[AsyncClient]:
     app.dependency_overrides[require_current_session] = authenticated
     try:
         async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test",
+            transport=ASGITransport(app=app),
+            base_url="http://test",
         ) as http_client:
             yield http_client
     finally:
@@ -29,10 +31,13 @@ async def client() -> AsyncIterator[AsyncClient]:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "mode", [MarketDataMode.EMBEDDED, MarketDataMode.LIVE, MarketDataMode.UNAVAILABLE],
+    "mode",
+    [MarketDataMode.EMBEDDED, MarketDataMode.LIVE, MarketDataMode.UNAVAILABLE],
 )
 async def test_unavailable_modes_return_one_versioned_contract(
-    client: AsyncClient, monkeypatch: pytest.MonkeyPatch, mode: MarketDataMode,
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+    mode: MarketDataMode,
 ) -> None:
     monkeypatch.setattr(settings, "market_data_mode", mode)
     quote = await client.get("/api/v1/assets/quotes?slug=btc-usdt")
@@ -74,7 +79,8 @@ def test_embedded_chart_enabled_without_a_provider_is_rejected() -> None:
 
 @pytest.mark.asyncio
 async def test_embedded_mode_capabilities_fail_closed_without_a_provider(
-    client: AsyncClient, monkeypatch: pytest.MonkeyPatch,
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(settings, "market_data_mode", MarketDataMode.EMBEDDED)
     monkeypatch.setattr(settings, "embedded_chart_provider", "none")
@@ -101,7 +107,10 @@ async def test_embedded_mode_capabilities_fail_closed_without_a_provider(
 @pytest.mark.parametrize("slug", ["btc-usdt", "eth-usdt", "xau-usd"])
 @pytest.mark.parametrize("timeframe", ["1m", "5m", "15m", "1h", "4h", "1d"])
 async def test_embedded_chart_config_validates_canonical_request_but_fails_closed(
-    client: AsyncClient, monkeypatch: pytest.MonkeyPatch, slug: str, timeframe: str,
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+    slug: str,
+    timeframe: str,
 ) -> None:
     monkeypatch.setattr(settings, "market_data_mode", MarketDataMode.EMBEDDED)
 
@@ -123,3 +132,69 @@ async def test_embedded_chart_config_rejects_unknown_slug_and_invalid_timeframe(
     for query in ("slug=unknown&timeframe=1h", "slug=btc-usdt&timeframe=2h"):
         response = await client.get(f"/api/v1/market-data/embedded-chart-config?{query}")
         assert response.status_code == 422
+
+
+def test_wrapper_origin_validation_and_settings_matrix() -> None:
+    assert (
+        canonical_wrapper_origin("http://127.0.0.1:4173/", environment="test")
+        == "http://127.0.0.1:4173"
+    )
+    assert (
+        canonical_wrapper_origin("https://WRAPPER.EXAMPLE.TEST:443", environment="test")
+        == "https://wrapper.example.test"
+    )
+    invalid_origins = (
+        "http://localhost:4173",
+        "http://0.0.0.0:4173",
+        "https://wrapper.example.test/path",
+        "https://wrapper.example.test?x=1",
+        "https://user:pass@wrapper.example.test",
+        "https://*.example.test",
+        "https://wrapper.example.test\\@evil.test",
+        "https://wrapper.example.test/%2fchart",
+    )
+    for invalid in invalid_origins:
+        with pytest.raises(ValueError):
+            canonical_wrapper_origin(invalid, environment="test")
+    configured = Settings(
+        market_data_mode=MarketDataMode.EMBEDDED,
+        embedded_chart_enabled=True,
+        embedded_chart_provider=EmbeddedChartProvider.TRADINGVIEW_ISOLATED_WRAPPER,
+        embedded_chart_wrapper_origin="http://127.0.0.1:4173",
+    )
+    assert configured.embedded_chart_wrapper_origin == "http://127.0.0.1:4173"
+    with pytest.raises(ValueError, match="not approved"):
+        Settings(
+            environment="production",
+            market_data_mode=MarketDataMode.EMBEDDED,
+            embedded_chart_enabled=True,
+            embedded_chart_provider=EmbeddedChartProvider.TRADINGVIEW_ISOLATED_WRAPPER,
+            embedded_chart_wrapper_origin="https://wrapper.example.test",
+            session_cookie_secure=True,
+            quote_source_label="approved",
+            quote_venue_label="approved",
+        )
+
+
+@pytest.mark.asyncio
+async def test_w3_wrapper_configuration_matrix(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "market_data_mode", MarketDataMode.EMBEDDED)
+    monkeypatch.setattr(settings, "embedded_chart_enabled", True)
+    monkeypatch.setattr(
+        settings, "embedded_chart_provider", EmbeddedChartProvider.TRADINGVIEW_ISOLATED_WRAPPER,
+    )
+    monkeypatch.setattr(settings, "embedded_chart_wrapper_origin", "http://127.0.0.1:4173")
+    for slug in ("btc-usdt", "eth-usdt", "xau-usd"):
+        for timeframe in ("1m", "5m", "15m", "1h", "4h", "1d"):
+            response = await client.get(
+                f"/api/v1/market-data/embedded-chart-config?slug={slug}&timeframe={timeframe}",
+            )
+            assert response.status_code == 200
+            assert response.headers["cache-control"] == "private, no-store"
+            assert (
+                response.json()["wrapper_url"] == f"http://127.0.0.1:4173/chart/{slug}/{timeframe}"
+            )
+            assert "?" not in response.json()["wrapper_url"]
+            assert "BINANCE:" not in response.json()["wrapper_url"]

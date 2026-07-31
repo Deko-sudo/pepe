@@ -3,10 +3,9 @@ from typing import Literal
 from pepe_quote_core import MarketDataMode, has_machine_readable_market_data
 from pydantic import BaseModel
 
+from app.core.embedded_chart import EmbeddedChartProvider
+
 CONTRACT_VERSION: Literal["v1"] = "v1"
-EmbeddedChartProvider = Literal["none"]
-CanonicalMarketSlug = Literal["btc-usdt", "eth-usdt", "xau-usd"]
-CanonicalTimeframe = Literal["1m", "5m", "15m", "1h", "4h", "1d"]
 
 
 class MarketDataCapabilityResponse(BaseModel):
@@ -16,34 +15,24 @@ class MarketDataCapabilityResponse(BaseModel):
     numeric_quotes_available: bool
     server_candles_available: bool
     embedded_chart_available: bool = False
+    embedded_chart_provider: EmbeddedChartProvider | None = None
+    embedded_chart_config_version: Literal[1] | None = None
     analytics_available: bool = False
     quote_cards_visible: bool
     unavailable_reason_code: str | None = None
 
 
-class FutureEmbeddedChartConfiguration(BaseModel):
-    """Typed server-authoritative extension point for an owner-approved provider."""
-
-    provider: str
-    canonical_slug: CanonicalMarketSlug
-    timeframe: CanonicalTimeframe
-    iframe_source: str
-    attribution: str
-    source_disclosure: str
-    delay_disclosure: str
-    fallback_url: str | None = None
-
-
 def capabilities_for(
     mode: MarketDataMode,
     *,
-    provider: EmbeddedChartProvider = "none",
+    provider: EmbeddedChartProvider = EmbeddedChartProvider.NONE,
     enabled: bool = False,
 ) -> MarketDataCapabilityResponse:
     machine_readable = has_machine_readable_market_data(mode)
+    embedded_available = enabled and provider is EmbeddedChartProvider.TRADINGVIEW_ISOLATED_WRAPPER
     embedded_reason = (
         "embedded_chart_provider_not_configured"
-        if mode is MarketDataMode.EMBEDDED and provider == "none"
+        if mode is MarketDataMode.EMBEDDED and not embedded_available
         else "market_data_not_configured"
     )
     return MarketDataCapabilityResponse(
@@ -51,7 +40,9 @@ def capabilities_for(
         status="available" if machine_readable else "unavailable",
         numeric_quotes_available=machine_readable,
         server_candles_available=machine_readable,
-        embedded_chart_available=False,
+        embedded_chart_available=embedded_available,
+        embedded_chart_provider=provider if embedded_available else None,
+        embedded_chart_config_version=1 if embedded_available else None,
         analytics_available=False,
         quote_cards_visible=machine_readable,
         unavailable_reason_code=None if machine_readable else embedded_reason,

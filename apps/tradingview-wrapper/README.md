@@ -2,7 +2,7 @@
 
 ## Status
 
-Technical-validation foundation only. It is not approved for production public display, hosting, DNS, TLS, Mini App integration, backend configuration, provider activation, or Stage 9.
+Technical-validation foundation only. W3's separate backend contract may return this wrapper's canonical local/test routes, but it does not approve production public display, hosting, DNS, TLS, Mini App integration, provider activation, or Stage 9.
 
 ## Isolation
 

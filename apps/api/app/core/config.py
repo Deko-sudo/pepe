@@ -5,6 +5,8 @@ from pepe_quote_core import MarketDataMode, validate_market_data_policy
 from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings
 
+from app.core.embedded_chart import EmbeddedChartProvider, canonical_wrapper_origin
+
 
 class Settings(BaseSettings):
     _synthetic_quote_source_label = "Synthetic test source"
@@ -26,8 +28,9 @@ class Settings(BaseSettings):
     quote_fake_provider_enabled: bool = False
     candle_fake_provider_enabled: bool = False
     market_data_mode: MarketDataMode = MarketDataMode.DEMO
-    embedded_chart_provider: Literal["none"] = "none"
+    embedded_chart_provider: EmbeddedChartProvider = EmbeddedChartProvider.NONE
     embedded_chart_enabled: bool = False
+    embedded_chart_wrapper_origin: str = ""
     quote_source_label: str = _synthetic_quote_source_label
     quote_venue_label: str = _synthetic_quote_venue_label
     quote_crypto_stale_after_seconds: int = 60
@@ -96,13 +99,35 @@ class Settings(BaseSettings):
             quote_fake_provider_enabled=self.quote_fake_provider_enabled,
             candle_fake_provider_enabled=self.candle_fake_provider_enabled,
         )
-        if self.embedded_chart_enabled:
-            raise ValueError("embedded_chart_enabled requires an approved embedded chart provider")
+        configured_wrapper = self.embedded_chart_wrapper_origin.strip()
         if self.market_data_mode is not MarketDataMode.EMBEDDED and (
             self.embedded_chart_enabled
-            or self.embedded_chart_provider != "none"
+            or self.embedded_chart_provider is not EmbeddedChartProvider.NONE
+            or configured_wrapper
         ):
             raise ValueError("embedded chart configuration is only valid in embedded mode")
+        if (
+            self.embedded_chart_enabled
+            and self.embedded_chart_provider is EmbeddedChartProvider.NONE
+        ):
+            raise ValueError("embedded_chart_enabled requires an approved embedded chart provider")
+        if self.embedded_chart_provider is EmbeddedChartProvider.NONE and configured_wrapper:
+            raise ValueError("embedded_chart_wrapper_origin requires an embedded chart provider")
+        if self.embedded_chart_provider is EmbeddedChartProvider.TRADINGVIEW_ISOLATED_WRAPPER:
+            if not self.embedded_chart_enabled:
+                raise ValueError("embedded_chart_provider requires embedded_chart_enabled")
+            if not configured_wrapper:
+                raise ValueError(
+                    "embedded_chart_wrapper_origin is required for tradingview_isolated_wrapper",
+                )
+            self.embedded_chart_wrapper_origin = canonical_wrapper_origin(
+                configured_wrapper,
+                environment=self.environment,
+            )
+            if self.environment == "production":
+                raise ValueError(
+                    "tradingview_isolated_wrapper production activation is not approved in W3",
+                )
         if self.environment == "production" and (
             not self.quote_source_label.strip()
             or self.quote_source_label == self._synthetic_quote_source_label
