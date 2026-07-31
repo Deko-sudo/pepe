@@ -140,14 +140,13 @@ Do not combine this sequence into an oversized PR unless the owner explicitly ch
 
 ## 20. Acceptance criteria
 
-Before production: an owner-approved direct-iframe provider with official integration/public-display evidence; approved exact mappings and intervals or approved unavailable handling; no top-level provider script/arbitrary URL/symbol; no Telegram/session data, extraction, persistence, or analytics; visible provider/source/venue/market semantics/delay/attribution; user-triggered fallback with `noopener,noreferrer`; working timeout/retry/blocked/outage states; successful kill switch/rollback; Android/Desktop evidence; CI main-push hardening merged with green exact-main CI; and Stage 9 unchanged.
+Before production: W1 is merged; the official TradingView script runs only inside the separate-origin wrapper and never in Pepe's top-level document; wrapper routes allowlist canonical slug/timeframe values with no arbitrary URL/symbol/interval; approved exact mappings and intervals; accepted XAU/USD semantics and visible disclosure; exact wrapper CSP and parent wrapper-only `frame-src`; validated minimal sandbox; parent iframe `referrerpolicy="no-referrer"` and equivalent restrictive parent response policy where appropriate; validated wrapper-owned lifecycle signaling with documented readiness limits; mandatory written TradingView confirmation for the intended public Mini App display; no Telegram/session/referrer data, extraction, persistence, or analytics; visible provider/source/venue/market semantics/delay/attribution; user-triggered fallback with `noopener,noreferrer`; working observable timeout/retry/unavailable behavior and honest `readiness-unknown` handling for unobservable nested content failures; successful active-client kill-switch propagation and rollback; Android/Desktop evidence; CI main-push hardening merged with green exact-main CI; and Stage 9 unchanged. The historical C1 conclusion remains: no qualified single direct-iframe provider was found.
 
 ## 21. Owner decisions still required
 
 - exact production wrapper hostname, hosting platform, DNS procedure, and TLS management;
 - final accepted OANDA XAU/USD semantics and visible disclosure;
 - fallback-link policy, popup policy, and exact production wrapper/Pepe CSP domains;
-- written TradingView public-display confirmation before production;
 - activation date and optional iOS smoke requirement.
 
 No timeout or non-response is approval.

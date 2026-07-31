@@ -42,7 +42,7 @@ The generated configuration includes `symbol`, `interval`, `theme`, `locale`, `t
 
 | Boundary | Role | Mandatory restriction |
 |---|---|---|
-| Origin A — Pepe Mini App | Authenticated Telegram Mini App | It embeds only an approved Origin B URL; it neither loads TradingView script nor reads a child DOM/window/message. |
+| Origin A — Pepe Mini App | Authenticated Telegram Mini App | It embeds only an approved Origin B URL with `referrerpolicy="no-referrer"`; it neither loads TradingView script nor reads a child DOM/window/message except for the narrow Origin-B lifecycle signals defined below. |
 | Origin B — wrapper | Future dedicated public static wrapper origin | It is distinct from Origin A, accepts only canonical route segments, owns no Pepe authentication state, and has no access to Origin A DOM/storage. |
 | Origin C — TradingView | Official script and nested widget origins | It is loaded only by Origin B. It has no access to Origin A DOM/storage and receives no Pepe identity, credential, or private parameter. |
 
@@ -101,7 +101,7 @@ Required wrapper headers: `Content-Security-Policy`, `X-Content-Type-Options: no
 
 ## 13. Pepe parent CSP
 
-The future parent policy may add only `frame-src https://<approved-wrapper-origin>`. Pepe must not allow TradingView domains in its `script-src`, `frame-src`, `connect-src`, or other parent directives. This PR makes no parent CSP change.
+The future parent policy may add only `frame-src https://<approved-wrapper-origin>`. Pepe must not allow TradingView domains in its `script-src`, `frame-src`, `connect-src`, or other parent directives. The future parent iframe element must set `referrerpolicy="no-referrer"`; where applicable, the Mini App response policy must also use an equivalent restrictive `Referrer-Policy`. This protects the initial Origin-A-to-Origin-B navigation, before any wrapper response header applies: Origin B must not receive the Pepe document URL, Telegram parameters, session-related query values, or other private parent-navigation data. This PR makes no parent CSP or response-header change.
 
 ## 14. Iframe sandbox and permissions
 
@@ -120,15 +120,19 @@ A parent `load` event establishes only `wrapper-document-loaded`. It cannot prov
 
 Future state names are: `capability-loading`, `capability-error`, `wrapper-config-loading`, `wrapper-disabled`, `wrapper-not-configured`, `wrapper-loading`, `wrapper-document-loaded`, `readiness-unknown`, `provider-ready`, `provider-timeout`, `provider-blocked`, `provider-unavailable`, `offline`, `unsupported-instrument`, `unsupported-timeframe`, and `permanent-configuration-error`.
 
-`provider-ready` is reserved for an official, origin-validated, non-market readiness signal. Unless W2 identifies one that can be safely consumed without inspecting provider data/messages, health remains `readiness-unknown` after wrapper document load.
+The future wrapper may emit a **narrow wrapper-owned lifecycle signal** to Pepe only for `wrapper-document-ready`, `provider-script-load-failed`, `provider-frame-created`, `provider-frame-document-loaded`, `provider-frame-timeout`, or `wrapper-configuration-invalid`. Pepe accepts it only when both `event.origin` is the exact approved wrapper origin and `event.source` is the currently mounted wrapper iframe window. There is no parent-to-wrapper command channel.
+
+These signals contain only a fixed lifecycle name and configuration-version-safe metadata. They contain no price, candle, provider-extracted symbol, provider DOM content, identifier, credential, session, Telegram data, or arbitrary payload. Pepe must not parse TradingView-origin messages or inspect the nested TradingView frame. Wrapper code may observe only its own script load/error events, insertion of the provider frame element, and that frame element's lifecycle events.
+
+`provider-frame-document-loaded` means only that the nested frame document loaded. It does not prove a usable chart, or that a regional block, consent, authentication, or provider-error page is absent. `provider-ready` remains unavailable unless TradingView later documents an official, origin-validated, non-market readiness signal that can be safely consumed; none is currently approved. Health therefore remains `readiness-unknown` after `provider-frame-document-loaded`.
 
 ## 16. Timeout and retry behavior
 
-A future Mini App integration clears its load timeout on parent frame load, exposes `readiness-unknown`, and may move to a conservative generic unavailable state after a bounded timeout. Retry is user-triggered or bounded and remounts the parent wrapper iframe; it never creates a retry storm, automatic redirect, stale DEMO value, or synthetic fallback. Asset/timeframe controls stay usable.
+A future Mini App integration clears its **wrapper-document** timeout on parent frame load, then uses bounded wrapper lifecycle timeouts for script/frame creation. Observable `provider-script-load-failed`, missing/late provider-frame creation, or `provider-frame-timeout` may converge to generic `provider-unavailable`; `provider-frame-document-loaded` exposes `readiness-unknown`. Retry is user-triggered or bounded and remounts the parent wrapper iframe; it never creates a retry storm, automatic redirect, stale DEMO value, or synthetic fallback. Asset/timeframe controls stay usable.
 
 ## 17. Blocking and outage behavior
 
-Offline, DNS/network failure, CSP blocking, provider region/consent/error pages, and cross-origin ambiguity must converge to a generic provider-unavailable state unless a local wrapper error is safely known. The UI must not assert a precise cause it cannot observe. A fallback link is user-initiated only, has no sensitive parameter, uses `noopener,noreferrer`, and is subject to the final owner-approved policy.
+Offline, DNS/network failure, and wrapper-observable script/frame creation failures may converge to generic `provider-unavailable`. Cross-origin isolation cannot reliably observe nested content-level provider outages, regional blocks, consent pages, authentication pages, or error pages after the frame document loads; those remain `readiness-unknown` with visible attribution, honest limitation text, and a user-triggered fallback link. The UI must not assert a precise cause it cannot observe. A fallback link has no sensitive parameter, uses `noopener,noreferrer`, and is subject to the final owner-approved policy.
 
 ## 18. Kill switch and active-client invalidation
 
@@ -138,13 +142,13 @@ W3/W4/W5 must provide bounded capability polling plus focus/visibility revalidat
 
 ## 19. Privacy
 
-No Telegram initData, authorization/session/cookie value, Telegram/user identifier, private query parameter, or Pepe storage is sent to Origin B/C. Pepe does not read wrapper/TradingView DOM, inspect screenshots, parse messages, extract quotes/candles, proxy provider traffic, or persist provider data.
+No Telegram initData, authorization/session/cookie value, Telegram/user identifier, private query parameter, Pepe document URL, or Pepe storage is sent to Origin B/C. The parent iframe's mandatory `referrerpolicy="no-referrer"` prevents initial parent-navigation referrer disclosure to Origin B. Pepe does not read wrapper/TradingView DOM, inspect screenshots, parse TradingView messages, extract quotes/candles, proxy provider traffic, or persist provider data; it accepts only the fixed, Origin-B-validated lifecycle signals in section 15.
 
 **Verified fact — official source:** [TradingView Privacy Policy](https://www.tradingview.com/privacy-policy/) (accessed 2026-07-31) says no account is needed for some public market viewing, but also describes cookies, web beacons, analytics, advertising, and third-party sharing for services. Thus the wrapper must neither claim tracker-free behavior nor forward Pepe identity; final production notice/consent obligations remain legal/privacy review gates.
 
 ## 20. Observability
 
-Allowed future privacy-safe events: wrapper configuration requested, iframe mounted, wrapper document load callback, timeout, retry, fallback clicked, disabled, generic unavailable, capability version changed, and wrapper unmounted by kill switch. Do not log credentials, identifiers, cookies, full potentially sensitive URLs, TradingView DOM/messages, prices, candles, screenshots, or extracted symbol content. Metrics must distinguish `wrapper document loaded` from `provider ready`.
+Allowed future privacy-safe events: wrapper configuration requested, iframe mounted, wrapper document load callback, fixed wrapper lifecycle event, timeout, retry, fallback clicked, disabled, generic unavailable, capability version changed, and wrapper unmounted by kill switch. Do not log credentials, identifiers, cookies, referrer values, full potentially sensitive URLs, TradingView DOM/messages, prices, candles, screenshots, or extracted symbol content. Metrics must distinguish `wrapper document loaded`, `provider-frame-document-loaded`, and `provider ready`.
 
 ## 21. Attribution and fallback navigation
 
@@ -174,21 +178,21 @@ Architecture planning does not certify Telegram clients. W7 requires physical Te
 
 ## 26. Rollback
 
-Future rollback sets the approved capability control to unavailable/disabled, confirms new loads receive no wrapper configuration, and after active revalidation exists unmounts active wrappers. Verify fresh load and active-client behavior, provider request cessation, no stale frame, no DEMO fallback, and no automatic re-enable until root cause and owner approval.
+Future rollback sets the approved capability control to unavailable/disabled, confirms new loads receive no wrapper configuration, and after active revalidation exists unmounts active wrappers. Verify fresh load and active-client behavior, provider request cessation, no stale frame, no DEMO fallback, and no automatic re-enable until root cause, terms change, and owner approval. A terms/public-display change or loss of the mandatory written TradingView confirmation requires this rollback path.
 
 ## 27. Planned implementation pull requests
 
 1. **W1 — Wrapper architecture qualification:** this documentation-only PR. Stop before merge.
 2. **W2 — Static isolated wrapper foundation:** static canonical routes, official script only inside wrapper, mappings/intervals, local/test hosting, wrapper headers/CSP, no Mini App integration or production DNS. Stop before merge.
 3. **W3 — Backend wrapper configuration contract:** provider enum, wrapper-origin configuration, allowlisted routes, successful versioned config response, startup validation, no arbitrary URL/symbol. Stop before merge.
-4. **W4 — Mini App wrapper integration:** dashboard and `/markets`, lifecycle, timeout/retry/fallback, capability revalidation, no quote/candle requests or DEMO fallback. Stop before merge.
-5. **W5 — CSP, blocking, and rollback hardening:** exact parent `frame-src`, sandbox, header tests, blocking behavior, active-client kill switch, rollback exercise, privacy-safe telemetry. Stop before merge.
+4. **W4 — Mini App wrapper integration:** dashboard and `/markets`, `referrerpolicy="no-referrer"`, validated wrapper-lifecycle handling, timeout/retry/fallback, capability revalidation, no quote/candle requests or DEMO fallback. Stop before merge.
+5. **W5 — CSP, blocking, and rollback hardening:** exact parent `frame-src`, parent response referrer policy, sandbox, effective-header tests, observable/unobservable failure handling, active-client kill switch, rollback exercise, privacy-safe telemetry. Stop before merge.
 6. **W6 — CI main-push hardening:** CI on PR and `main` push, exact-main evidence, remediation procedure; merge before production activation. Stop before merge.
-7. **W7 — Telegram validation and production activation:** dedicated production wrapper origin, DNS/TLS, Android/Desktop smoke, production configuration, kill-switch exercise, launch checklist. Stop before merge.
+7. **W7 — Telegram validation and production activation:** mandatory written TradingView confirmation for intended public display; dedicated production wrapper origin, DNS/TLS, Android/Desktop smoke, production configuration, kill-switch exercise, and launch checklist. Stop before merge.
 
 ## 28. Acceptance criteria
 
-Before any production activation: official script still documented; W2 proves canonical routes and HTTPS behavior; written terms/public-display clearance; approved exact mappings and XAU semantics; full domain/subresource inventory; narrow wrapper CSP and parent frame-only CSP; accepted sandbox; visible attribution; no identity flow or extraction; timeout/block/rollback/active invalidation evidence; W6 merged with green exact-main CI; W7 Android/Desktop evidence; and Stage 9 unchanged.
+Before any production activation: W1 is merged; official script remains documented and runs only inside the separate-origin wrapper, never Pepe's top-level document; W2 proves canonical route allowlisting and HTTPS behavior; approved exact mappings/intervals and accepted XAU semantics; mandatory written TradingView confirmation for intended public display; full domain/subresource inventory; narrow wrapper CSP and parent frame-only CSP; parent `referrerpolicy="no-referrer"` and equivalent restrictive parent response policy where appropriate; accepted sandbox; validated wrapper lifecycle signaling with documented readiness limits; visible attribution; no identity flow or extraction; timeout/block/rollback/active invalidation evidence; W6 merged with green exact-main CI; W7 Android/Desktop evidence; and Stage 9 unchanged.
 
 ## 29. Unresolved owner decisions
 
@@ -196,7 +200,6 @@ Before any production activation: official script still documented; W2 proves ca
 - Exact Pepe production origin(s) for wrapper `frame-ancestors`.
 - Acceptance of OANDA XAU/USD semantics and final visible disclosure.
 - Fallback-link policy and whether visible attribution links may open popups/require `allow-popups`.
-- Whether written TradingView confirmation is mandatory before production (this architecture recommends **yes**).
 - Production activation date, physical iOS requirement, and privacy-safe wrapper metric retention.
 
 ## 30. Stage 9 boundary
