@@ -6,7 +6,11 @@
 
 ## 1. Decision status
 
-No candidate proved every mandatory requirement. No provider is selected. The narrowest next owner decision is whether to relax one hard constraint (exact USDT pairs, exact spot XAU/USD, all six native candle intervals, single-provider architecture, or direct-iframe-only architecture) or fund/approve a separately researched account-based provider. This PR must not be treated as approval for any relaxation.
+No candidate proved every mandatory requirement. No provider is selected.
+
+**Current split-provider decision:** a split-provider architecture is **not acceptable for C1**. The owner expressly withheld authorization for it, and the approved roadmap requires one provider decision before C2. A split would create two unapproved third-party trust, availability, attribution, privacy, CSP, redirect, outage, and mobile-validation surfaces, while also requiring a different configuration and rollback contract. It is not a harmless fallback for a failed single-provider search.
+
+The narrowest next owner decision is whether to authorize a separately scoped split-provider qualification, relax one other hard constraint (exact USDT pairs, exact spot XAU/USD, all six native candle intervals, or direct-iframe-only architecture), or fund/approve a separately researched account-based provider. A split-provider authorization would first require all individual-provider C1 requirements, an explicit mapping of which provider serves which Pepe slug, independent public-display rights and attribution, exact domains/redirects, separate restrictive sandbox/CSP assessments, combined Telegram Android/Desktop validation, combined outage/kill-switch/rollback tests, and owner approval of the added security and operational surface. This PR must not be treated as approval for any relaxation.
 
 ## 2. Research date and scope
 
@@ -20,7 +24,7 @@ A date-range control or refresh cadence is not a candle interval. Hard failures 
 
 ## 4. Candidate discovery
 
-Nine plausible products were reviewed: MetalCharts, CoinGecko Widgets, TradingView (excluded baseline), CoinMarketCap Widgets, Investing.com Webmaster Tools, CryptoCompare, Twelve Data, Barchart, and FINVIZ. The first three were mandatory candidates. The final five additional candidates were included because they publicly market market-data charts/widgets or chart/data products; their quick pass found no official evidence of the required single-provider direct-iframe contract.
+Nine plausible products were reviewed: MetalCharts, CoinGecko Widgets, TradingView (excluded baseline), CoinMarketCap Widgets, Investing.com Webmaster Tools, CryptoCompare, Twelve Data, Barchart, and FINVIZ. The first three were mandatory candidates. The final six additional candidates were included because they publicly market market-data charts/widgets or chart/data products; their quick pass found no official evidence of the required single-provider direct-iframe contract.
 
 ## 5. Disqualified candidates
 
@@ -32,8 +36,8 @@ Nine plausible products were reviewed: MetalCharts, CoinGecko Widgets, TradingVi
 | CoinMarketCap Widgets | [CoinMarketCap ticker widgets](https://coinmarketcap.com/widget/ticker/) | **Verified fact:** official page markets cryptocurrency ticker widgets. It does not prove exact spot XAU/USD or all six native candle intervals in a single chart contract. Fails required instrument/timeframe evidence. |
 | Investing.com Webmaster Tools | [Investing.com Webmaster Tools](https://www.investing.com/webmaster-tools/), [Terms](https://www.investing.com/terms-and-conditions) | **Verified fact:** official page markets tools including technical charts and crypto/currency widgets. **Explicit terms conflict:** its public page states that use, storage, reproduction, display, modification, transmission, or distribution of data is prohibited without explicit prior written permission. No owner/provider written permission is available. Fails usage-rights clarity. |
 | CryptoCompare | [CryptoCompare API documentation](https://min-api.cryptocompare.com/documentation) | **Technical observation:** current official documentation access returned HTTP 401 in the test environment. No official public direct-iframe chart contract was demonstrated; API documentation is not an iframe permission. Fails architecture evidence. |
-| Twelve Data | [Twelve Data](https://twelvedata.com/) | **Technical observation:** the `www.twelve-data.com` widget URL could not resolve in this test environment; the accessible product materials do not establish a no-key public direct iframe covering all required assets/intervals. Fails architecture/access evidence. |
-| Barchart | [Barchart](https://www.barchart.com/) | **Technical observation:** the historical `/widgets` route returned an official 404. No current official public direct-iframe contract was found for exact USDT pairs and spot XAU/USD. Fails architecture and instrument evidence. |
+| Twelve Data | [Twelve Data](https://twelvedata.com/), [tested widget route](https://www.twelve-data.com/widgets) | **Technical observation (accessed 2026-07-31):** the tested `https://www.twelve-data.com/widgets` host could not resolve in this test environment; accessible product materials do not establish a no-key public direct iframe covering all required assets/intervals. Fails architecture/access evidence. |
+| Barchart | [Barchart](https://www.barchart.com/), [tested widgets route](https://www.barchart.com/widgets) | **Technical observation (accessed 2026-07-31):** the tested official `/widgets` route returned 404. No current official public direct-iframe contract was found for exact USDT pairs and spot XAU/USD. Fails architecture and instrument evidence. |
 | FINVIZ | [FINVIZ](https://finviz.com/) | **Verified fact:** official product is a market screener/chart site. No official public direct-iframe widget documentation was found for crypto USDT pairs, spot XAU/USD, or the required intervals. Fails architecture and coverage evidence. |
 
 ## 6. Detailed finalist comparison
@@ -101,21 +105,21 @@ If a later provider qualifies, validation must record only `frame-document-loade
 
 ## 19. Scoring matrix
 
-Scores are `0–5`; `—` means no score because a hard failure ended evaluation. Total does not override hard failures.
+Scores are `0–5`, where `0` means no official evidence satisfies that category and `5` means current official evidence fully satisfies it. `EXCLUDED` means the owner prohibited selection before scoring. `UNPROVEN` means documentation access or scope did not establish the category. A hard failure is stated in the final column; only a hard failure prevents selection. Total does not override a hard failure.
 
 | Candidate | Direct iframe | BTC/USDT | ETH/USDT | Spot XAU/USD | Six intervals | Rights clarity | Free/no-key | Sandbox/privacy | Docs/operations | Hard failure |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
 | MetalCharts | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | HTTPS and exact-instrument failure |
-| CoinGecko Widgets | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 1 | contract/instrument/timeframe evidence absent |
-| TradingView baseline | — | — | — | — | — | — | — | — | — | owner-excluded |
-| CoinMarketCap Widgets | 1 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 1 | required coverage absent |
-| Investing.com | 1 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 2 | rights conflict |
+| CoinGecko Widgets | UNPROVEN | UNPROVEN | UNPROVEN | 0 | UNPROVEN | UNPROVEN | 3 | UNPROVEN | 1 | contract/instrument/timeframe evidence absent |
+| TradingView baseline | EXCLUDED | EXCLUDED | EXCLUDED | EXCLUDED | EXCLUDED | EXCLUDED | EXCLUDED | EXCLUDED | EXCLUDED | owner-excluded (not a technical hard-failure finding) |
+| CoinMarketCap Widgets | UNPROVEN | 0 | 0 | 0 | 0 | UNPROVEN | 3 | UNPROVEN | 1 | required coverage absent |
+| Investing.com | UNPROVEN | 0 | 0 | 0 | 0 | 0 | 3 | UNPROVEN | 2 | rights conflict |
 | CryptoCompare | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 1 | no public direct-iframe proof |
 | Twelve Data | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 1 | no public direct-iframe proof |
 | Barchart | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | no current widget contract |
 | FINVIZ | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 1 | no public direct-iframe proof |
 
-**Scoring winner:** none. The model produces no winner because every candidate has a hard failure.
+**Scoring winner:** none. Every selection-eligible candidate has at least one hard failure; TradingView is separately owner-excluded and is not counted as a technical hard-failure conclusion.
 
 ## 20. Selected provider or no-qualified-provider conclusion
 
