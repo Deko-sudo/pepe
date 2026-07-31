@@ -66,7 +66,7 @@
     if (!container) return invalid();
     observeFrame(container);
     timerId = window.setTimeout(() => {
-      if (!emitted.has("provider-frame-created")) { emit("provider-frame-timeout"); showError(); }
+      if (!emitted.has("provider-frame-document-loaded")) { emit("provider-frame-timeout"); showError(); }
     }, timeoutMs);
     const script = document.createElement("script");
     script.src = SCRIPT_URL;
@@ -77,7 +77,11 @@
       timezone: "Etc/UTC", allow_symbol_change: false, hide_side_toolbar: true,
       hide_top_toolbar: true, save_image: false, withdateranges: false, watchlist: [],
     });
-    script.addEventListener("error", () => { emit("provider-script-load-failed"); showError(); }, { once: true });
+    script.addEventListener("error", () => {
+      if (timerId !== null) window.clearTimeout(timerId);
+      emit("provider-script-load-failed");
+      showError();
+    }, { once: true });
     container.append(script);
   }
 

@@ -29,3 +29,10 @@ test("origin inventory remains metadata-only and rejects HTTP and wildcard appro
   assert.equal(inventory.wildcardHostsNecessary, false);
   assert.deepEqual(inventory.nestedFrameOrigins, ["https://s.tradingview.com"]);
 });
+
+test("Nginx serves extensionless canonical documents as HTML without dropping inherited headers", async () => {
+  const nginx = await readFile(path.join(root, "nginx.conf"), "utf8");
+  assert.match(nginx, /location ~ \^\/chart[\s\S]*?default_type text\/html;[\s\S]*?try_files \$uri =404;/);
+  assert.match(nginx, /add_header Content-Security-Policy[\s\S]*?add_header Cache-Control "no-store" always;/);
+  assert.doesNotMatch(nginx, /location ~ \^\/chart[\s\S]*?add_header Cache-Control/);
+});

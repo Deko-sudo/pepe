@@ -17,7 +17,10 @@ test.before(async () => {
   wrapperServer = createStaticServer({ root: dist, port: 4173 });
   harnessServer = createStaticServer({ root: dist, port: 4174, harness: true });
   await Promise.all([once(wrapperServer, "listening"), once(harnessServer, "listening")]);
-  browser = await chromium.launch({ executablePath: "/usr/bin/chromium", headless: true });
+  browser = await chromium.launch({
+    ...(process.env.CI ? {} : { executablePath: "/usr/bin/chromium" }),
+    headless: true,
+  });
 });
 test.after(async () => {
   await browser?.close();
