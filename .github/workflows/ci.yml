@@ -53,6 +53,8 @@ jobs:
           npm test
       - name: Install wrapper browser test dependency
         run: npm ci
+      - name: Install Mini App dependencies for parent browser integration
+        run: npm --prefix ../mini-app ci
       - name: Install Chromium for wrapper browser tests
         run: npx playwright install --with-deps chromium
       - name: Run separate-origin wrapper browser tests

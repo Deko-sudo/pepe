@@ -105,6 +105,22 @@ describe("EmbeddedMarketChart", () => {
     expect(screen.queryByText(/временно недоступен/i)).not.toBeInTheDocument();
   });
 
+  it("aborts pending configuration and removes the active frame when capability is lost", async () => {
+    let resolveConfiguration: (response: Response) => void;
+    const pending = new Promise<Response>((resolve) => { resolveConfiguration = resolve; });
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockReturnValue(pending);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const subject = (enabled: boolean) => <QueryClientProvider client={client}><EmbeddedMarketChart slug="btc-usdt" timeframe="1h" enabled={enabled} /></QueryClientProvider>;
+    const view = render(subject(true));
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+    const signal = fetchSpy.mock.calls[0][1]?.signal as AbortSignal;
+    view.rerender(subject(false));
+    await waitFor(() => expect(signal.aborted).toBe(true));
+    resolveConfiguration!(new Response(JSON.stringify(configuration), { status: 200 }));
+    await waitFor(() => expect(view.container.querySelector("iframe")).toBeNull());
+    expect(screen.getByText(/не поддерживается/i)).toBeInTheDocument();
+  });
+
   it("keeps the newer selection when a cancelled prior configuration settles late", async () => {
     let resolveFirst: (response: Response) => void;
     const first = new Promise<Response>((resolve) => { resolveFirst = resolve; });

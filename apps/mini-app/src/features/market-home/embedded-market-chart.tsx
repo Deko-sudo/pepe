@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getEmbeddedChartConfiguration,
   type EmbeddedChartConfiguration,
@@ -49,6 +49,7 @@ export function EmbeddedMarketChart(props: EmbeddedMarketChartProps) {
 }
 
 function IsolatedEmbeddedMarketChart({ slug, timeframe, enabled }: Exclude<EmbeddedMarketChartProps, { state: "provider-not-configured" }>) {
+  const queryClient = useQueryClient();
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [state, setState] = useState<ChartState>(enabled ? "loading" : "unsupported");
   const configuration = useQuery({
@@ -60,6 +61,9 @@ function IsolatedEmbeddedMarketChart({ slug, timeframe, enabled }: Exclude<Embed
     retry: false,
   });
 
+  useEffect(() => {
+    if (!enabled) void queryClient.cancelQueries({ queryKey: ["embedded-chart-configuration", slug, timeframe] });
+  }, [enabled, queryClient, slug, timeframe]);
   useEffect(() => { setState(enabled ? "loading" : "unsupported"); }, [enabled, slug, timeframe]);
   const validConfiguration: EmbeddedChartConfiguration | null = configuration.data ?? null;
 
