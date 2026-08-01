@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "purpose": "Reviewed metadata-only allowlist for the opt-in manual subresource revalidation tool. This is not production CSP approval.",
+  "origins": {
+    "https://s3.tradingview.com": ["script"],
+    "https://s.tradingview.com": ["document"],
+    "wss://s.tradingview.com": ["websocket"]
+  }
+}

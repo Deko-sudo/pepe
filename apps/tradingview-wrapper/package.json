@@ -7,9 +7,10 @@
     "build": "node src/build.mjs",
     "lint": "node src/lint.mjs",
     "typecheck": "node src/typecheck.mjs",
-    "test": "node --test tests/routes.test.mjs tests/security.test.mjs tests/server.test.mjs",
+    "test": "node --test tests/routes.test.mjs tests/security.test.mjs tests/server.test.mjs tests/subresource-revalidation.test.mjs",
     "e2e": "node --test tests/*.browser.test.mjs",
-    "provider-check": "node src/provider-check.mjs"
+    "provider-check": "node src/provider-check.mjs",
+    "subresource-revalidate": "node src/subresource-revalidation.mjs"
   },
   "devDependencies": {
     "playwright": "^1.62.1"

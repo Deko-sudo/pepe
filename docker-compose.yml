@@ -29,6 +29,15 @@ x-api-environment: &api-environment
   SESSION_ALLOWED_ORIGINS: "${SESSION_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:4000,http://localhost:8080}"
 
 services:
+  embedded-chart-security-bundle:
+    container_name: pepe-embedded-chart-security-bundle
+    image: pepe-embedded-chart-security-bundle
+    build: *api-build
+    command: ["python", "scripts/compile_embedded_chart_security_bundle.py", "--manifest", "/workspace/config/embedded-chart-security.development.json", "--output", "/run/pepe/embedded-chart-security"]
+    volumes:
+      - embedded_chart_security_bundle:/run/pepe
+    restart: "no"
+
   mini-app:
     container_name: pepe-mini-app
     build:
@@ -39,7 +48,12 @@ services:
     ports:
       - "${MINI_APP_PORT:-4000}:80"
     depends_on:
-      - api
+      api:
+        condition: service_started
+      embedded-chart-security-bundle:
+        condition: service_completed_successfully
+    volumes:
+      - embedded_chart_security_bundle:/run/pepe:ro
     networks:
       - pepe-network
 
@@ -50,7 +64,11 @@ services:
     ports:
       - "${API_EXT_PORT:-8100}:8000"
     environment: *api-environment
+    volumes:
+      - embedded_chart_security_bundle:/run/pepe:ro
     depends_on:
+      embedded-chart-security-bundle:
+        condition: service_completed_successfully
       migrate:
         condition: service_completed_successfully
       postgres:
@@ -69,13 +87,27 @@ services:
   migrate:
     container_name: pepe-migrate
     image: pepe-api
-    build: *api-build
     command: ["alembic", "upgrade", "head"]
     restart: "no"
     environment: *migrate-environment
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - pepe-network
+
+  tradingview-wrapper:
+    container_name: pepe-tradingview-wrapper
+    build:
+      context: ./apps/tradingview-wrapper
+      dockerfile: Dockerfile
+    ports:
+      - "${TRADINGVIEW_WRAPPER_PORT:-4173}:8080"
+    volumes:
+      - embedded_chart_security_bundle:/run/pepe:ro
+    depends_on:
+      embedded-chart-security-bundle:
+        condition: service_completed_successfully
     networks:
       - pepe-network
 
@@ -214,6 +246,7 @@ networks:
     driver: bridge
 
 volumes:
+  embedded_chart_security_bundle:
   pepe_postgres_data:
   caddy_data:
   caddy_config:

@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY packages/quote-core /workspace/packages/quote-core
 COPY apps/api /workspace/apps/api
+COPY config /workspace/config
 WORKDIR /workspace/apps/api
 RUN pip install --no-cache-dir /workspace/packages/quote-core \
     && pip install --no-cache-dir ".[dev]"

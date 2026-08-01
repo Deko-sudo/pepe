@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -10,6 +11,7 @@ from pepe_quote_core import MarketDataMode
 from app.api.dependencies.session import require_current_session
 from app.core.config import Settings, settings
 from app.core.embedded_chart import EmbeddedChartProvider, canonical_wrapper_origin
+from app.core.embedded_chart_security_bundle import compile_security_bundle
 from app.main import app
 
 
@@ -190,7 +192,7 @@ def test_embedded_chart_provider_is_allowed_only_in_local_environments(environme
 
 @pytest.mark.asyncio
 async def test_w3_wrapper_configuration_matrix(
-    client: AsyncClient, monkeypatch: pytest.MonkeyPatch,
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ) -> None:
     monkeypatch.setattr(settings, "market_data_mode", MarketDataMode.EMBEDDED)
     monkeypatch.setattr(settings, "embedded_chart_enabled", True)
@@ -198,6 +200,20 @@ async def test_w3_wrapper_configuration_matrix(
         settings, "embedded_chart_provider", EmbeddedChartProvider.TRADINGVIEW_ISOLATED_WRAPPER,
     )
     monkeypatch.setattr(settings, "embedded_chart_wrapper_origin", "http://127.0.0.1:4173")
+    compile_security_bundle(
+        {
+            "version": 1,
+            "environment": "test",
+            "market_data_mode": "embedded",
+            "embedded_chart_enabled": True,
+            "embedded_chart_provider": "tradingview_isolated_wrapper",
+            "embedded_chart_kill_switch": False,
+            "parent_origin": "http://127.0.0.1:4174",
+            "wrapper_origin": "http://127.0.0.1:4173",
+        },
+        tmp_path / "bundle",
+    )
+    monkeypatch.setattr(settings, "embedded_chart_security_bundle_path", str(tmp_path / "bundle"))
     for slug in ("btc-usdt", "eth-usdt", "xau-usd"):
         for timeframe in ("1m", "5m", "15m", "1h", "4h", "1d"):
             response = await client.get(
@@ -210,3 +226,39 @@ async def test_w3_wrapper_configuration_matrix(
             )
             assert "?" not in response.json()["wrapper_url"]
             assert "BINANCE:" not in response.json()["wrapper_url"]
+
+
+@pytest.mark.asyncio
+async def test_killed_bundle_withdraws_embedded_chart_without_leaking_origins(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    compile_security_bundle(
+        {
+            "version": 1,
+            "environment": "test",
+            "market_data_mode": "embedded",
+            "embedded_chart_enabled": True,
+            "embedded_chart_provider": "tradingview_isolated_wrapper",
+            "embedded_chart_kill_switch": True,
+            "parent_origin": "http://127.0.0.1:4180",
+            "wrapper_origin": "http://127.0.0.1:4182",
+        },
+        tmp_path / "bundle",
+    )
+    monkeypatch.setattr(settings, "embedded_chart_security_bundle_path", str(tmp_path / "bundle"))
+
+    capabilities = await client.get("/api/v1/market-data/capabilities")
+    configuration = await client.get(
+        "/api/v1/market-data/embedded-chart-config?slug=btc-usdt&timeframe=1h",
+    )
+
+    assert capabilities.status_code == 200
+    assert capabilities.headers["cache-control"] == "private, no-store"
+    assert capabilities.json()["embedded_chart_available"] is False
+    assert capabilities.json()["embedded_chart_provider"] is None
+    assert configuration.status_code == 409
+    assert configuration.headers["cache-control"] == "private, no-store"
+    assert "127.0.0.1:4182" not in configuration.text
+    assert "tradingview" not in configuration.text.lower()

@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
 
@@ -6,6 +7,10 @@ from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings
 
 from app.core.embedded_chart import EmbeddedChartProvider, canonical_wrapper_origin
+from app.core.embedded_chart_security_bundle import (
+    EmbeddedChartSecurityBundle,
+    load_security_bundle,
+)
 
 
 class Settings(BaseSettings):
@@ -31,6 +36,7 @@ class Settings(BaseSettings):
     embedded_chart_provider: EmbeddedChartProvider = EmbeddedChartProvider.NONE
     embedded_chart_enabled: bool = False
     embedded_chart_wrapper_origin: str = ""
+    embedded_chart_security_bundle_path: str = "/run/pepe/embedded-chart-security"
     quote_source_label: str = _synthetic_quote_source_label
     quote_venue_label: str = _synthetic_quote_venue_label
     quote_crypto_stale_after_seconds: int = 60
@@ -68,6 +74,20 @@ class Settings(BaseSettings):
         return tuple(
             origin.strip() for origin in self.session_allowed_origins.split(",") if origin.strip()
         )
+
+    @property
+    def embedded_chart_security_bundle(self) -> EmbeddedChartSecurityBundle:
+        try:
+            return load_security_bundle(Path(self.embedded_chart_security_bundle_path))
+        except (OSError, ValueError):
+            return EmbeddedChartSecurityBundle(
+                digest="",
+                environment="invalid",
+                enabled=False,
+                provider=EmbeddedChartProvider.NONE,
+                parent_origin=None,
+                wrapper_origin=None,
+            )
 
     @model_validator(mode="after")
     def validate_session_settings(self) -> "Settings":
