@@ -16,4 +16,4 @@ The Mini App consumes only W2's closed `{ type, version, event }` lifecycle payl
 
 ## Production boundary
 
-The deterministic test fixture is local and contains no TradingView dependency. W4 does not activate a provider, change parent CSP, add hosting/DNS/TLS, or implement W5 CSP/kill-switch/rollback controls. W6 workflow changes, W7 production gates, and Stage 9 remain out of scope. Written TradingView confirmation remains mandatory before production activation.
+The W2 deterministic separate-origin wrapper fixture remains local and contains no TradingView dependency; W4 does not add a Mini App browser fixture or a live third-party CI dependency. W4 does not activate a provider, change parent CSP, add hosting/DNS/TLS, or implement W5 CSP/kill-switch/rollback controls. W6 workflow changes, W7 production gates, and Stage 9 remain out of scope. Written TradingView confirmation remains mandatory before production activation.

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { activateSessionToken, clearSessionToken } from "../src/shared/api";
-import { CandleSchema, getQuotes, QuoteSchema } from "../src/shared/api/market";
+import { CandleSchema, getEmbeddedChartConfiguration, getQuotes, QuoteSchema, type Timeframe } from "../src/shared/api/market";
 
 const quote = {
   slug: "btc-usdt",
@@ -30,6 +30,17 @@ const quote = {
     delay_class: "realtime",
   },
 };
+
+const embeddedConfiguration = (slug: string, timeframe: Timeframe) => ({
+  version: 1,
+  mode: "embedded",
+  provider: "tradingview_isolated_wrapper",
+  asset: slug,
+  timeframe,
+  wrapper_origin: "http://127.0.0.1:4173",
+  wrapper_path: `/chart/${slug}/${timeframe}`,
+  wrapper_url: `http://127.0.0.1:4173/chart/${slug}/${timeframe}`,
+});
 
 afterEach(() => {
   clearSessionToken();
@@ -95,5 +106,36 @@ describe("market API client", () => {
     expect(fetchSpy.mock.calls[0][1]).toEqual(expect.objectContaining({ credentials: "include" }));
     const headers = new Headers(fetchSpy.mock.calls[0][1]?.headers);
     expect(headers.get("Authorization")).toContain("desktop-session-token");
+  });
+
+  it.each(
+    ["btc-usdt", "eth-usdt", "xau-usd"].flatMap((slug) =>
+      (["1m", "5m", "15m", "1h", "4h", "1d"] as Timeframe[]).map((timeframe) => [slug, timeframe] as const),
+    ),
+  )("requests the exact authenticated W3 configuration route for %s %s", async (slug, timeframe) => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(embeddedConfiguration(slug, timeframe)), { status: 200 }));
+
+    await getEmbeddedChartConfiguration(slug, timeframe);
+
+    expect(fetchSpy.mock.calls[0][0]).toBe(`/api/v1/market-data/embedded-chart-config?slug=${slug}&timeframe=${timeframe}`);
+    expect(fetchSpy.mock.calls[0][1]).toEqual(expect.objectContaining({ credentials: "include" }));
+  });
+
+  it("passes caller cancellation through to the authenticated configuration request", async () => {
+    const controller = new AbortController();
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(embeddedConfiguration("btc-usdt", "1h")), { status: 200 }));
+
+    await getEmbeddedChartConfiguration("btc-usdt", "1h", controller.signal);
+
+    expect(fetchSpy.mock.calls[0][1]).toEqual(expect.objectContaining({ signal: controller.signal, credentials: "include" }));
+  });
+
+  it("preserves an intentional AbortError rather than converting it to an API error", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const abortError = new DOMException("The operation was aborted", "AbortError");
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(abortError);
+
+    await expect(getEmbeddedChartConfiguration("btc-usdt", "1h", controller.signal)).rejects.toBe(abortError);
   });
 });
