@@ -81,7 +81,10 @@ export function validateEmbeddedChartConfiguration(
   }
   const origin = new URL(configuration.wrapper_origin);
   const url = new URL(configuration.wrapper_url);
-  const isTradingViewHost = (hostname: string) => hostname === "tradingview.com" || hostname.endsWith(".tradingview.com");
+  const isTradingViewHost = (hostname: string) => {
+    const normalizedHostname = hostname.replace(/\.+$/, "");
+    return normalizedHostname === "tradingview.com" || normalizedHostname.endsWith(".tradingview.com");
+  };
   if (
     !["http:", "https:"].includes(origin.protocol) || origin.username || origin.password ||
     origin.pathname !== "/" || origin.search || origin.hash || url.username || url.password ||

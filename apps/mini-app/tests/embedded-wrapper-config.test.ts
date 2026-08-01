@@ -41,6 +41,7 @@ describe("W3 embedded wrapper configuration", () => {
     ["malformed URL", { ...config, wrapper_url: "https://[" }],
     ["direct TradingView", { ...config, wrapper_origin: "https://tradingview.com", wrapper_url: "https://tradingview.com/chart/btc-usdt/1h" }],
     ["TradingView subdomain", { ...config, wrapper_origin: "https://s.tradingview.com", wrapper_url: "https://s.tradingview.com/chart/btc-usdt/1h" }],
+    ["TradingView trailing root dot", { ...config, wrapper_origin: "https://tradingview.com.", wrapper_url: "https://tradingview.com./chart/btc-usdt/1h" }],
     ["unknown security field", { ...config, session: "[REDACTED]" }],
   ])("rejects unsafe %s", (_, value) => expect(() => validate(value)).toThrow());
 
