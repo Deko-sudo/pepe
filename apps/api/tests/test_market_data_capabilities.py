@@ -172,9 +172,12 @@ def test_wrapper_origin_validation_and_settings_matrix() -> None:
         embedded_chart_wrapper_origin="http://127.0.0.1:4173",
     )
     assert configured.embedded_chart_wrapper_origin == "http://127.0.0.1:4173"
-    with pytest.raises(ValueError, match="not approved"):
+
+@pytest.mark.parametrize("environment", ["production", "staging", "preview", "qa", "unknown"])
+def test_embedded_chart_provider_is_allowed_only_in_local_environments(environment: str) -> None:
+    with pytest.raises(ValueError, match="allowed only in development or test"):
         Settings(
-            environment="production",
+            environment=environment,
             market_data_mode=MarketDataMode.EMBEDDED,
             embedded_chart_enabled=True,
             embedded_chart_provider=EmbeddedChartProvider.TRADINGVIEW_ISOLATED_WRAPPER,

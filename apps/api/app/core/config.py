@@ -120,6 +120,10 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "embedded_chart_wrapper_origin is required for tradingview_isolated_wrapper",
                 )
+            if self.environment not in {"development", "test"}:
+                raise ValueError(
+                    "tradingview_isolated_wrapper is allowed only in development or test during W3",
+                )
             self.embedded_chart_wrapper_origin = canonical_wrapper_origin(
                 configured_wrapper,
                 environment=self.environment,
