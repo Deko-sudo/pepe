@@ -4,7 +4,7 @@
 
 ## Authoritative immutable bundle
 
-`config/embedded-chart-security.development.json` is a secretless local/development source manifest. The repository compiler, `apps/api/scripts/compile_embedded_chart_security_bundle.py`, validates it and atomically publishes one directory containing `api-settings.json`, `mini-app-security.conf`, `wrapper-security.conf`, `bundle-metadata.json`, and `bundle.sha256`.
+`config/embedded-chart-security.development.json` is a secretless local/development source manifest. The repository compiler, `apps/api/scripts/compile_embedded_chart_security_bundle.py`, validates it and atomically publishes one directory containing `api-settings.json`, `mini-app-security.conf`, `wrapper-security.conf`, `bundle-metadata.json`, and `bundle.sha256`. Compose binds the runtime `APP_ENV` into compilation; production therefore compiles a blocked bundle, and the API independently treats an environment-mismatched bundle as unavailable.
 
 The security digest is calculated from deterministic security-effective inputs; no wall-clock value affects it. Every generated Nginx response adds the non-sensitive `X-Pepe-Embedded-Chart-Bundle` digest. Consumers must mount the same published bundle read-only at `/run/pepe/embedded-chart-security`; a missing or malformed artifact fails closed.
 
@@ -34,6 +34,6 @@ Written TradingView confirmation for the intended embedding, Telegram Mini App, 
 
 ## Deterministic runtime coverage and cleanup
 
-The root Docker CI smoke starts the API, Mini App, and wrapper with the development bundle, then requests only local Mini App and wrapper routes. It verifies the generated parent CSP has the exact wrapper `frame-src` and no provider source, verifies the wrapper's exact parent `frame-ancestors`, requests one local chart document, and requires matching non-sensitive bundle digests on both Nginx responses. It does not request the provider frame or any TradingView URL.
+The root Docker CI smoke starts the API, Mini App, and wrapper with the development bundle, then requests only local Mini App and wrapper routes. It verifies the generated parent CSP has the exact wrapper `frame-src` and no provider source, verifies the wrapper's exact `http://localhost:4000` parent `frame-ancestors`, requests one local chart document, and requires matching non-sensitive bundle digests on both Nginx responses. It does not request the provider frame or any TradingView URL.
 
-The compiler tests cover the complementary blocked bundle: a strict JSON kill switch, invalid input, unsupported environments, and production compile to `frame-src 'none'`, `frame-ancestors 'none'`, and local chart-route `503` handling. Test bundle directories are temporary and must not be retained in the repository; local Compose cleanup uses the non-destructive `docker compose down --remove-orphans` command and never removes volumes.
+The compiler tests cover the complementary blocked bundle: a strict JSON kill switch, invalid input, unsupported environments, and production compile to `frame-src 'none'`, `frame-ancestors 'none'`, and local chart-route `503` handling. Test bundle directories are temporary and must not be retained in the repository; bounded local cleanup stops only the named W5 consumers with `docker compose stop api mini-app tradingview-wrapper` and never removes volumes.

@@ -4,7 +4,7 @@ The owner-approved W5 control plane is a generated immutable bundle, not a remot
 
 The compiler rejects malformed values without repair. Only strict JSON booleans are accepted for the kill switch. Development/test can authorize only `embedded` + `tradingview_isolated_wrapper` with distinct exact HTTP(S) origins. Production and every invalid/missing value compile to a blocked bundle.
 
-Compile with:
+Compile with (the Compose deployment binds `APP_ENV` explicitly, so a production runtime compiles the production-blocked state rather than activating this development source manifest):
 
 `python apps/api/scripts/compile_embedded_chart_security_bundle.py --manifest config/embedded-chart-security.development.json --output <bundle-dir>`
 

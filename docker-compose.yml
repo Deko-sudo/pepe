@@ -33,7 +33,9 @@ services:
     container_name: pepe-embedded-chart-security-bundle
     image: pepe-embedded-chart-security-bundle
     build: *api-build
-    command: ["python", "scripts/compile_embedded_chart_security_bundle.py", "--manifest", "/workspace/config/embedded-chart-security.development.json", "--output", "/run/pepe/embedded-chart-security"]
+    command: ["python", "scripts/compile_embedded_chart_security_bundle.py", "--manifest", "/workspace/config/embedded-chart-security.development.json", "--environment", "${APP_ENV:-development}", "--output", "/run/pepe/embedded-chart-security"]
+    environment:
+      APP_ENV: "${APP_ENV:-development}"
     volumes:
       - embedded_chart_security_bundle:/run/pepe
     restart: "no"

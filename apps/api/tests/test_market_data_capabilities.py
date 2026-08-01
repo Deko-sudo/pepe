@@ -194,6 +194,7 @@ def test_embedded_chart_provider_is_allowed_only_in_local_environments(environme
 async def test_w3_wrapper_configuration_matrix(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ) -> None:
+    monkeypatch.setattr(settings, "environment", "test")
     monkeypatch.setattr(settings, "market_data_mode", MarketDataMode.EMBEDDED)
     monkeypatch.setattr(settings, "embedded_chart_enabled", True)
     monkeypatch.setattr(
@@ -262,3 +263,35 @@ async def test_killed_bundle_withdraws_embedded_chart_without_leaking_origins(
     assert configuration.headers["cache-control"] == "private, no-store"
     assert "127.0.0.1:4182" not in configuration.text
     assert "tradingview" not in configuration.text.lower()
+
+
+@pytest.mark.asyncio
+async def test_bundle_from_another_runtime_environment_is_unavailable(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    compile_security_bundle(
+        {
+            "version": 1,
+            "environment": "development",
+            "market_data_mode": "embedded",
+            "embedded_chart_enabled": True,
+            "embedded_chart_provider": "tradingview_isolated_wrapper",
+            "embedded_chart_kill_switch": False,
+            "parent_origin": "http://localhost:4000",
+            "wrapper_origin": "http://127.0.0.1:4173",
+        },
+        tmp_path / "bundle",
+    )
+    monkeypatch.setattr(settings, "environment", "production")
+    monkeypatch.setattr(settings, "embedded_chart_security_bundle_path", str(tmp_path / "bundle"))
+
+    capabilities = await client.get("/api/v1/market-data/capabilities")
+    configuration = await client.get(
+        "/api/v1/market-data/embedded-chart-config?slug=btc-usdt&timeframe=1h",
+    )
+
+    assert capabilities.json()["embedded_chart_available"] is False
+    assert configuration.status_code == 409
+    assert "127.0.0.1:4173" not in configuration.text

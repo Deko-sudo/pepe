@@ -78,7 +78,12 @@ class Settings(BaseSettings):
     @property
     def embedded_chart_security_bundle(self) -> EmbeddedChartSecurityBundle:
         try:
-            return load_security_bundle(Path(self.embedded_chart_security_bundle_path))
+            bundle = load_security_bundle(Path(self.embedded_chart_security_bundle_path))
+            # The bundle is a deployment artifact. A development artifact must
+            # never authorize an embedded provider in another runtime tier.
+            if bundle.environment != self.environment:
+                raise ValueError("embedded-chart security bundle environment mismatch")
+            return bundle
         except (OSError, ValueError):
             return EmbeddedChartSecurityBundle(
                 digest="",

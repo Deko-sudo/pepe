@@ -5,6 +5,6 @@
   "embedded_chart_enabled": true,
   "embedded_chart_provider": "tradingview_isolated_wrapper",
   "embedded_chart_kill_switch": false,
-  "parent_origin": "http://127.0.0.1:4000",
+  "parent_origin": "http://localhost:4000",
   "wrapper_origin": "http://127.0.0.1:4173"
 }

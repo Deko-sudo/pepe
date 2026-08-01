@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 from app.core.embedded_chart_security_bundle import compile_security_bundle
@@ -13,10 +14,16 @@ def main() -> None:
     )
     parser.add_argument("--manifest", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument(
+        "--environment",
+        default=os.environ.get("APP_ENV", "development"),
+        help="Runtime environment bound into the generated bundle.",
+    )
     arguments = parser.parse_args()
     manifest = json.loads(arguments.manifest.read_text())
     if not isinstance(manifest, dict):
         raise ValueError("embedded-chart security manifest must be a JSON object")
+    manifest["environment"] = arguments.environment
     compile_security_bundle(manifest, arguments.output)
 
 

@@ -292,7 +292,7 @@ jobs:
   docker:
     name: Docker
     runs-on: ubuntu-latest
-    needs: [frontend, api, quote-core, migration, bot, worker]
+    needs: [frontend, api, quote-core, migration, bot, worker, tradingview-wrapper]
     steps:
       - uses: actions/checkout@v4
       - name: Validate Docker Compose
@@ -334,7 +334,7 @@ jobs:
           curl --fail --silent --show-error --output /dev/null http://localhost:4173/chart/btc-usdt/1h
           printf '%s\n' "$mini_headers" | grep -Fi "content-security-policy: default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'none'; frame-src http://127.0.0.1:4173;"
           ! printf '%s\n' "$mini_headers" | grep -Fi 'tradingview.com'
-          printf '%s\n' "$wrapper_headers" | grep -Fi "content-security-policy: default-src 'none'; base-uri 'none'; object-src 'none'; form-action 'none'; frame-ancestors http://127.0.0.1:4000; script-src 'self' https://s3.tradingview.com;"
+          printf '%s\n' "$wrapper_headers" | grep -Fi "content-security-policy: default-src 'none'; base-uri 'none'; object-src 'none'; form-action 'none'; frame-ancestors http://localhost:4000; script-src 'self' https://s3.tradingview.com;"
           mini_digest=$(printf '%s\n' "$mini_headers" | grep -i '^x-pepe-embedded-chart-bundle:' | tr -d '\r' | cut -d ' ' -f 2)
           wrapper_digest=$(printf '%s\n' "$wrapper_headers" | grep -i '^x-pepe-embedded-chart-bundle:' | tr -d '\r' | cut -d ' ' -f 2)
           test -n "$mini_digest"
