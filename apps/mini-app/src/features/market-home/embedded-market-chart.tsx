@@ -67,21 +67,29 @@ function IsolatedEmbeddedMarketChart({ slug, timeframe, enabled }: Exclude<Embed
     if (!validConfiguration) return;
     setState("navigating");
     const origin = new URL(validConfiguration.wrapper_origin).origin;
+    const timeout = window.setTimeout(() => setState("unavailable"), 10_000);
     const onMessage = (event: MessageEvent<unknown>) => {
       const frame = frameRef.current;
       if (!frame || event.origin === "null" || event.origin !== origin || event.source !== frame.contentWindow || !isLifecycleMessage(event.data)) return;
+      window.clearTimeout(timeout);
       if (event.data.event === "provider-script-load-failed" || event.data.event === "provider-frame-timeout") setState("unavailable");
       else if (event.data.event === "wrapper-configuration-invalid") setState("invalid");
       else if (event.data.event === "provider-frame-document-loaded") setState("readiness-unknown");
       else if (event.data.event === "wrapper-document-ready") setState("wrapper-loaded");
     };
     window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
+    return () => {
+      window.clearTimeout(timeout);
+      window.removeEventListener("message", onMessage);
+    };
   }, [validConfiguration]);
 
   if (!enabled) return <ChartStatus state="unsupported" />;
   if (configuration.isLoading) return <ChartStatus state="loading" />;
-  if (configuration.isError) return <ChartStatus state={configuration.error instanceof ApiError && configuration.error.status === 409 ? "unavailable" : "invalid"} />;
+  if (configuration.isError) {
+    if (configuration.error instanceof ApiError && configuration.error.status === 409) return <ChartStatus state="unavailable" />;
+    return <section className="card" aria-live="polite"><h2 className="text-sm font-medium text-text-secondary">Встроенный график</h2><p className="mt-3 text-sm" role="alert">{messages.invalid}</p><button className="mt-2 underline" onClick={() => { void configuration.refetch(); }}>Повторить</button></section>;
+  }
   if (!validConfiguration) return <ChartStatus state="invalid" />;
 
   return <section className="card" aria-live="polite">
