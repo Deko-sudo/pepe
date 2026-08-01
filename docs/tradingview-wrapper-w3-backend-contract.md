@@ -2,7 +2,7 @@
 
 ## Status
 
-W1 and W2 are merged. W3 is delivered by this PR and awaits owner merge approval. W4–W7 are not started. This contract does not approve TradingView public display, production activation, hosting, DNS, TLS, CSP changes, or the mandatory written TradingView confirmation.
+W1, W2, and W3 are merged. W4 consumes this contract through the Mini App `/markets` surface and is delivered by its current PR awaiting owner merge approval. W5–W7 are not started. This contract does not approve TradingView public display, production activation, hosting, DNS, TLS, CSP changes, or the mandatory written TradingView confirmation.
 
 ## Configuration and fail-closed policy
 
@@ -22,4 +22,4 @@ Capabilities remain authenticated and private/no-store. Valid local/test configu
 
 ## Boundaries
 
-W3 makes no backend wrapper fetch, DNS lookup, TradingView fetch, proxy, market-data ingestion, quote/candle change, Mini App integration, parent CSP change, wrapper-runtime change, analytics, user/session/Telegram forwarding, or Stage 9 change. Ordinary CI is offline relative to the wrapper and TradingView. W4 may consume the contract only after approval; W5 owns runtime kill-switch/rollback integration; W6 and W7 retain their main-push and production gates.
+W3 makes no backend wrapper fetch, DNS lookup, TradingView fetch, proxy, market-data ingestion, quote/candle change, parent CSP change, wrapper-runtime change, analytics, user/session/Telegram forwarding, or Stage 9 change. W4 consumes only a validated server URL; it performs no wrapper/provider fetch, does not inspect iframe DOM, and remains offline relative to TradingView in CI. W5 owns runtime kill-switch/rollback integration; W6 and W7 retain their main-push and production gates.

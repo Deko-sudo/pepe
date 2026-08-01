@@ -1,6 +1,6 @@
 # Isolated TradingView wrapper architecture (PR W1)
 
-> **Decision status:** ARCHITECTURE MERGED. W2 static technical-validation evidence is merged. W3's backend-only configuration contract is delivered separately and awaits owner merge approval; neither approves production integration, contractual use, hosting, CSP, or provider activation.
+> **Decision status:** ARCHITECTURE MERGED. W2 static technical-validation evidence and W3's backend-only configuration contract are merged. W4 consumes the authenticated contract on `/markets` and awaits owner merge approval; it does not approve production integration, contractual use, hosting, CSP, or provider activation.
 > **Research date:** 2026-07-31. Official public sources below were accessed on that date from an unauthenticated environment.
 
 ## 1. Decision status
