@@ -47,22 +47,67 @@ export const MarketDataCapabilitiesSchema = z.object({
   numeric_quotes_available: z.boolean(),
   server_candles_available: z.boolean(),
   embedded_chart_available: z.boolean(),
+  embedded_chart_provider: z.literal("tradingview_isolated_wrapper").nullable(),
+  embedded_chart_config_version: z.literal(1).nullable(),
   analytics_available: z.boolean(),
   quote_cards_visible: z.boolean(),
   unavailable_reason_code: z.string().nullable(),
 });
 export type MarketDataCapabilities = z.infer<typeof MarketDataCapabilitiesSchema>;
 
+export const EmbeddedChartProviderSchema = z.literal("tradingview_isolated_wrapper");
+export const EmbeddedChartConfigurationSchema = z.object({
+  version: z.literal(1),
+  mode: z.literal("embedded"),
+  provider: EmbeddedChartProviderSchema,
+  asset: z.enum(["btc-usdt", "eth-usdt", "xau-usd"]),
+  timeframe: TimeframeSchema,
+  wrapper_origin: z.string(),
+  wrapper_path: z.string(),
+  wrapper_url: z.string(),
+}).strict();
+export type EmbeddedChartConfiguration = z.infer<typeof EmbeddedChartConfigurationSchema>;
 
-async function request<T>(path: string, schema: z.ZodType<T>): Promise<T> {
+export function validateEmbeddedChartConfiguration(
+  value: unknown,
+  asset: string,
+  timeframe: Timeframe,
+  miniAppOrigin: string,
+): EmbeddedChartConfiguration {
+  const configuration = EmbeddedChartConfigurationSchema.parse(value);
+  const expectedPath = `/chart/${asset}/${timeframe}`;
+  if (configuration.asset !== asset || configuration.timeframe !== timeframe || configuration.wrapper_path !== expectedPath) {
+    throw new Error("Embedded chart configuration does not match the requested route");
+  }
+  const origin = new URL(configuration.wrapper_origin);
+  const url = new URL(configuration.wrapper_url);
+  const isTradingViewHost = (hostname: string) => hostname === "tradingview.com" || hostname.endsWith(".tradingview.com");
+  if (
+    !["http:", "https:"].includes(origin.protocol) || origin.username || origin.password ||
+    origin.pathname !== "/" || origin.search || origin.hash || url.username || url.password ||
+    url.search || url.hash || url.origin !== origin.origin || url.pathname !== expectedPath ||
+    url.origin === miniAppOrigin || isTradingViewHost(origin.hostname) || isTradingViewHost(url.hostname)
+  ) {
+    throw new Error("Embedded chart configuration violates wrapper isolation");
+  }
+  return configuration;
+}
+
+
+async function request<T>(path: string, schema: z.ZodType<T>, signal?: AbortSignal): Promise<T> {
   let response: Response;
-  try { response = await fetch(`${API_BASE}${path}`, withSessionAuth()); }
-  catch { throw new ApiError("Network request failed", 0); }
+  try { response = await fetch(`${API_BASE}${path}`, { ...withSessionAuth(), signal }); }
+  catch (error) {
+    if (signal?.aborted) throw error;
+    throw new ApiError("Network request failed", 0);
+  }
   if (!response.ok) throw new ApiError(`HTTP ${response.status}`, response.status);
   return schema.parse(await response.json());
 }
 export const getAssets = () => request("/assets?limit=100", CatalogSchema);
 export const getMarketDataCapabilities = () => request("/market-data/capabilities", MarketDataCapabilitiesSchema);
+export const getEmbeddedChartConfiguration = (slug: string, timeframe: Timeframe, signal?: AbortSignal) =>
+  request(`/market-data/embedded-chart-config?slug=${encodeURIComponent(slug)}&timeframe=${timeframe}`, EmbeddedChartConfigurationSchema, signal);
 
 export const getQuotes = (slugs: string[]) => {
   const query = slugs.map((slug) => `slug=${encodeURIComponent(slug)}`).join("&");
