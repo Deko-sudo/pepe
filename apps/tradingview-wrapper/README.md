@@ -45,6 +45,10 @@ No storage, cookie write, auth, Telegram data, analytics SDK, API key, credentia
 
 `provider/tradingview-script.json` records an observed hash, not an immutable pin. `make tradingview-wrapper-provider-check` retrieves only the exact official script URL, rejects HTTP redirects, compares SHA-256, and fails on a change without modifying metadata. A change requires explicit review and complete origin/subresource revalidation before any later approval.
 
+## Manual metadata-only subresource revalidation
+
+`npm run subresource-revalidate -- path/to/captured-metadata.json` is an opt-in, offline evaluator: it does not start a browser, contact TradingView, parse provider DOM, or save response bodies. A controlled manual session may supply only synthetic-safe network metadata records (`resource`, `redirect`, `blocked`, and `csp-violation`). The evaluator compares every origin/resource-class pair with `provider/subresource-allowlist.json`, fails closed for unknown pairs, and redacts every query value and fragment from its report. It is deliberately excluded from ordinary CI; its automated coverage uses deterministic synthetic records only.
+
 ## Remaining blockers
 
 Written TradingView confirmation for intended public display, production origin/hosting/DNS/TLS, accepted production CSP/sandbox, W3–W7, physical Telegram testing, XAU owner acceptance, and CI/main-push hardening remain mandatory. See `docs/tradingview-wrapper-w2-validation.md`.

@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
+from pepe_quote_core import MarketDataMode
 
 from app.api.dependencies.session import require_current_session
 from app.core.config import settings
@@ -25,11 +26,12 @@ _CACHE_CONTROL = {"Cache-Control": "private, no-store"}
 async def get_market_data_capabilities(
     _auth: Annotated[AuthenticatedSession, Depends(require_current_session)],
 ) -> JSONResponse:
+    bundle = settings.embedded_chart_security_bundle
     return JSONResponse(
         content=capabilities_for(
-            settings.market_data_mode,
-            provider=settings.embedded_chart_provider,
-            enabled=settings.embedded_chart_enabled,
+            MarketDataMode.EMBEDDED if bundle.enabled else settings.market_data_mode,
+            provider=bundle.provider,
+            enabled=bundle.enabled,
         ).model_dump(mode="json"),
         headers=_CACHE_CONTROL,
     )
@@ -41,13 +43,14 @@ async def get_embedded_chart_config(
     slug: Annotated[CanonicalMarketSlug, Query()],
     timeframe: Annotated[CanonicalTimeframe, Query()],
 ) -> JSONResponse:
+    bundle = settings.embedded_chart_security_bundle
     if (
-        settings.embedded_chart_enabled
-        and settings.embedded_chart_provider is EmbeddedChartProvider.TRADINGVIEW_ISOLATED_WRAPPER
+        bundle.enabled
+        and bundle.provider is EmbeddedChartProvider.TRADINGVIEW_ISOLATED_WRAPPER
     ):
         return JSONResponse(
             content=wrapper_configuration(
-                origin=settings.embedded_chart_wrapper_origin,
+                origin=bundle.wrapper_origin or "",
                 slug=slug,
                 timeframe=timeframe,
             ).model_dump(mode="json"),
@@ -56,7 +59,7 @@ async def get_embedded_chart_config(
     return JSONResponse(
         status_code=409,
         content=unavailable_market_data_error(
-            settings.market_data_mode,
+            MarketDataMode.EMBEDDED if bundle.enabled else settings.market_data_mode,
             "embedded_chart",
             reason_code="embedded_chart_provider_not_configured",
         ),

@@ -121,6 +121,57 @@ describe("EmbeddedMarketChart", () => {
     expect(screen.getByText(/не поддерживается/i)).toBeInTheDocument();
   });
 
+  it("removes an already-mounted iframe when capability is killed", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(configuration), { status: 200 }));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const subject = (enabled: boolean) => <QueryClientProvider client={client}><EmbeddedMarketChart slug="btc-usdt" timeframe="1h" enabled={enabled} /></QueryClientProvider>;
+    const view = render(subject(true));
+    await waitFor(() => {
+      if (!view.container.querySelector("iframe")) throw new Error("iframe not mounted");
+    });
+
+    view.rerender(subject(false));
+
+    expect(view.container.querySelector("iframe")).toBeNull();
+    expect(screen.getByText(/не поддерживается/i)).toBeInTheDocument();
+  });
+
+  it("keeps a killed chart absent, then recovers only with the new identity after a stale response settles", async () => {
+    let resolveFirst: (response: Response) => void;
+    const first = new Promise<Response>((resolve) => { resolveFirst = resolve; });
+    const recoveredConfiguration = {
+      ...configuration,
+      asset: "eth-usdt",
+      wrapper_path: "/chart/eth-usdt/1h",
+      wrapper_url: "http://127.0.0.1:4173/chart/eth-usdt/1h",
+    };
+    const fetchSpy = vi.spyOn(globalThis, "fetch")
+      .mockReturnValueOnce(first)
+      .mockResolvedValueOnce(new Response(JSON.stringify(recoveredConfiguration), { status: 200 }));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const subject = (slug: string, enabled: boolean) => <QueryClientProvider client={client}><EmbeddedMarketChart slug={slug} timeframe="1h" enabled={enabled} /></QueryClientProvider>;
+    const view = render(subject("btc-usdt", true));
+
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+    const firstSignal = fetchSpy.mock.calls[0][1]?.signal as AbortSignal;
+    view.rerender(subject("btc-usdt", false));
+    await waitFor(() => expect(firstSignal.aborted).toBe(true));
+    expect(view.container.querySelector("iframe")).toBeNull();
+
+    view.rerender(subject("eth-usdt", true));
+    const recoveredFrame = await waitFor(() => {
+      const frame = view.container.querySelector("iframe");
+      if (!frame || frame.getAttribute("src") !== recoveredConfiguration.wrapper_url) throw new Error("recovered iframe not mounted");
+      return frame;
+    });
+    resolveFirst!(new Response(JSON.stringify(configuration), { status: 200 }));
+
+    await waitFor(() => expect(view.container.querySelector("iframe")).toBe(recoveredFrame));
+    expect(recoveredFrame).toHaveAttribute("src", recoveredConfiguration.wrapper_url);
+    expect(recoveredFrame).toHaveAttribute("sandbox", "allow-scripts allow-same-origin");
+    expect(recoveredFrame).not.toHaveAttribute("allow");
+  });
+
   it("keeps the newer selection when a cancelled prior configuration settles late", async () => {
     let resolveFirst: (response: Response) => void;
     const first = new Promise<Response>((resolve) => { resolveFirst = resolve; });
