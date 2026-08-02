@@ -87,7 +87,10 @@ class Settings(BaseSettings):
             cache_key = (str(path), self.environment, (path / "bundle.sha256").stat().st_mtime_ns)
         except OSError:
             cache_key = None
-        if self._embedded_chart_bundle_cache is not None and cache_key == self._embedded_chart_bundle_cache_key:
+        if (
+            self._embedded_chart_bundle_cache is not None
+            and cache_key == self._embedded_chart_bundle_cache_key
+        ):
             return self._embedded_chart_bundle_cache
         try:
             bundle = load_security_bundle(path)
@@ -96,7 +99,10 @@ class Settings(BaseSettings):
             if bundle.environment != self.environment:
                 raise ValueError("embedded-chart security bundle environment mismatch")
         except (OSError, ValueError) as error:
-            logger.warning("Embedded-chart security bundle unavailable; disabling charts: %s", error)
+            logger.warning(
+                "Embedded-chart security bundle unavailable; disabling charts: %s",
+                error,
+            )
             bundle = EmbeddedChartSecurityBundle(
                 digest="",
                 environment="invalid",
