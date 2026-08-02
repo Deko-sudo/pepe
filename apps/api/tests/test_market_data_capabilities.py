@@ -285,6 +285,18 @@ async def test_bundle_from_another_runtime_environment_is_unavailable(
         tmp_path / "bundle",
     )
     monkeypatch.setattr(settings, "environment", "production")
+    monkeypatch.setattr(settings, "market_data_mode", MarketDataMode.EMBEDDED)
+    monkeypatch.setattr(settings, "embedded_chart_enabled", True)
+    monkeypatch.setattr(
+        settings,
+        "embedded_chart_provider",
+        EmbeddedChartProvider.TRADINGVIEW_ISOLATED_WRAPPER,
+    )
+    monkeypatch.setattr(
+        settings,
+        "embedded_chart_wrapper_origin",
+        "http://127.0.0.1:4173",
+    )
     monkeypatch.setattr(settings, "embedded_chart_security_bundle_path", str(tmp_path / "bundle"))
 
     capabilities = await client.get("/api/v1/market-data/capabilities")
