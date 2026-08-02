@@ -6,7 +6,25 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
+  wrapper-ci-security-contract:
+    name: Wrapper CI security contract
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify PR and main-push wrapper-security contract
+        run: python scripts/verify_wrapper_ci_contract.py
+
   frontend:
     name: Frontend
     runs-on: ubuntu-latest

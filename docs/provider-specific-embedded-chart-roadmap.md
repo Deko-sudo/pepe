@@ -126,12 +126,12 @@ Publish the selected provider's dated official documentation/terms evidence, att
 ## 19. Planned pull requests
 
 1. **PR C1 — Direct-iframe provider research:** **completed with no qualified single provider**; see [direct-iframe qualification results](direct-iframe-provider-selection.md). Its direct-iframe restriction is superseded by the later owner decision below, not rewritten.
-2. **PR W1 — Wrapper architecture qualification:** this [isolated TradingView wrapper architecture](isolated-tradingview-wrapper-architecture.md), including official mechanism, proposed mappings/intervals, isolation, terms assessment, CSP/sandbox design, and revised sequence. Stop before merge.
-3. **PR W2 — Static isolated wrapper foundation:** **PR READY — AWAITS OWNER MERGE APPROVAL.** Canonical static routes, official script only inside wrapper, local/test hosting, wrapper headers/CSP, lifecycle harness, and W2 validation evidence; no Mini App integration or production DNS. Stop before merge.
-4. **PR W3 — Backend wrapper configuration contract:** provider enum, wrapper-origin config, allowlisted routes, successful versioned config and startup validation; no arbitrary URL/symbol. Stop before merge.
-5. **PR W4 — Mini App wrapper integration:** dashboard and `/markets`, iframe lifecycle, timeout/retry/fallback, capability revalidation, no quote/candle requests or DEMO fallback. Stop before merge.
-6. **PR W5 — CSP, blocking, and rollback hardening:** exact parent `frame-src`, sandbox, effective-header tests, provider blocking, active-client kill switch, rollback exercise, privacy-safe telemetry. Stop before merge.
-7. **PR W6 — CI main-push hardening:** push-to-main workflow, exact-main SHA evidence, and remediation; must merge before production activation. Stop before merge.
+2. **PR W1 — Wrapper architecture qualification:** merged.
+3. **PR W2 — Static isolated wrapper foundation:** merged.
+4. **PR W3 — Backend wrapper configuration contract:** merged.
+5. **PR W4 — Mini App wrapper integration:** merged.
+6. **PR W5 — CSP, blocking, and rollback hardening:** merged.
+7. **PR W6 — CI main-push hardening:** delivered by the current PR and awaiting owner merge approval; see [W6 CI main-push security gates](tradingview-wrapper-w6-ci-main-gates.md). Must merge before production activation.
 8. **PR W7 — Telegram validation and production activation:** production wrapper origin, DNS/TLS, Android/Desktop evidence, production config, kill-switch exercise, and launch checklist. Stop before merge.
 
 Do not combine this sequence into an oversized PR unless the owner explicitly changes the plan.
