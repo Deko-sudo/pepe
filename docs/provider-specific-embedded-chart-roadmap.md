@@ -19,7 +19,7 @@ The merged foundation is server-authoritative and fail-closed:
 - `GET /api/v1/market-data/embedded-chart-config` validates canonical slug/timeframe input, then returns versioned `409 market_data_unavailable` with `embedded_chart_provider_not_configured`.
 - Root dashboard and `/markets` retain asset/timeframe selection in embedded mode, render a neutral provider-not-configured state, and do not request quotes/candles or fall back to DEMO.
 
-W1, W2, and W3 are merged. W4 is delivered by its current Mini App PR and awaits owner merge approval; W5–W7 are not started. W3 adds a fail-closed authenticated configuration contract for the isolated wrapper's 18 canonical local/test routes. W4 consumes only its validated server URL on `/markets`, with exact source/origin lifecycle checks and readiness-unknown semantics. Neither phase approves parent-CSP change, backend/provider network request, production activation, or Stage 9 change. Production remains blocked pending mandatory written TradingView confirmation and later W5–W7 gates.
+W1–W5 are merged. W6 is delivered by the current PR, awaits exact-head contract and Docker CI evidence, then awaits owner merge approval; W7 is not started. W3 adds a fail-closed authenticated configuration contract for the isolated wrapper's 18 canonical local/test routes. W4 consumes only its validated server URL on `/markets`, with exact source/origin lifecycle checks and readiness-unknown semantics. Neither phase approves parent-CSP change, backend/provider network request, production activation, or Stage 9 change. Production remains blocked pending mandatory written TradingView confirmation and later W6–W7 gates.
 
 ## 3. Owner-approved direction
 

@@ -1,6 +1,6 @@
 # W6 CI main-push security gates
 
-> Status: W1, W2, W3, W4, and W5 are merged. W6 is delivered by the current pull request and awaits owner merge approval. W7 is not started. Production activation, provider activation, hosting, DNS, TLS, Telegram device validation, and Stage 9 are out of scope.
+> Status: W1, W2, W3, W4, and W5 are merged. W6 is delivered by the current pull request, but awaits exact-head contract and Docker CI evidence followed by owner merge approval. W7 is not started. Production activation, provider activation, hosting, DNS, TLS, Telegram device validation, and Stage 9 are out of scope.
 
 ## Scope
 
@@ -26,6 +26,6 @@ make test
 make build
 ```
 
-GitHub event dispatch itself is not reproducible locally. The verifier structurally proves both `pull_request` targeting `main` and `push` to `main` use the repository commit and invoke the mandatory W6 contract gate. Exact-head PR CI proves the pull-request execution path. No direct push to `main` is used for pre-merge testing.
+GitHub event dispatch itself is not reproducible locally. The verifier structurally proves both `pull_request` targeting `main` and `push` to `main` use the repository commit and invoke the mandatory W6 contract gate. Exact-head PR CI, including the contract and Docker jobs, is required before W6 readiness. No direct push to `main` is used for pre-merge testing.
 
 W7 remains responsible for Telegram device validation, infrastructure, and any production activation. Written TradingView confirmation remains mandatory before production activation.

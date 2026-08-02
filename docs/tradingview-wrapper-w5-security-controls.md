@@ -1,6 +1,6 @@
 # W5 isolated-wrapper security controls
 
-> Status: W1–W5 are merged. W6 is delivered by the current pull request and awaits owner merge approval; W7 is not started. Provider activation, production origins, hosting, DNS, TLS, Telegram device validation, and Stage 9 remain out of scope.
+> Status: W1–W5 are merged. W6 is delivered by the current pull request, awaits exact-head contract and Docker CI evidence, then awaits owner merge approval; W7 is not started. Provider activation, production origins, hosting, DNS, TLS, Telegram device validation, and Stage 9 remain out of scope.
 
 ## Authoritative immutable bundle
 
