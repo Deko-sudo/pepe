@@ -127,6 +127,17 @@ def test_loaded_api_settings_refuse_digest_mismatch_and_missing_bundle(tmp_path:
         load_security_bundle(output)
 
 
+def test_loader_rejects_security_header_digest_mismatch(tmp_path: Path) -> None:
+    output = tmp_path / "bundle"
+    compile_security_bundle(active_manifest(), output)
+    digest = (output / "bundle.sha256").read_text().strip()
+    security_conf = output / "wrapper-security.conf"
+    security_conf.write_text(security_conf.read_text().replace(digest, "0" * 64))
+
+    with pytest.raises(ValueError, match="header digest"):
+        load_security_bundle(output)
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [

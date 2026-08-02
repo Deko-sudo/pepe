@@ -1,9 +1,10 @@
+import logging
 from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
 
 from pepe_quote_core import MarketDataMode, validate_market_data_policy
-from pydantic import AliasChoices, Field, model_validator
+from pydantic import AliasChoices, Field, PrivateAttr, model_validator
 from pydantic_settings import BaseSettings
 
 from app.core.embedded_chart import EmbeddedChartProvider, canonical_wrapper_origin
@@ -12,10 +13,14 @@ from app.core.embedded_chart_security_bundle import (
     load_security_bundle,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class Settings(BaseSettings):
     _synthetic_quote_source_label = "Synthetic test source"
     _synthetic_quote_venue_label = "Synthetic test venue"
+    _embedded_chart_bundle_cache: EmbeddedChartSecurityBundle | None = PrivateAttr(default=None)
+    _embedded_chart_bundle_cache_key: tuple[str, str, int] | None = PrivateAttr(default=None)
 
     app_name: str = "Pepe"
     app_slug: str = "pepe"
@@ -77,15 +82,22 @@ class Settings(BaseSettings):
 
     @property
     def embedded_chart_security_bundle(self) -> EmbeddedChartSecurityBundle:
+        path = Path(self.embedded_chart_security_bundle_path)
         try:
-            bundle = load_security_bundle(Path(self.embedded_chart_security_bundle_path))
+            cache_key = (str(path), self.environment, (path / "bundle.sha256").stat().st_mtime_ns)
+        except OSError:
+            cache_key = None
+        if self._embedded_chart_bundle_cache is not None and cache_key == self._embedded_chart_bundle_cache_key:
+            return self._embedded_chart_bundle_cache
+        try:
+            bundle = load_security_bundle(path)
             # The bundle is a deployment artifact. A development artifact must
             # never authorize an embedded provider in another runtime tier.
             if bundle.environment != self.environment:
                 raise ValueError("embedded-chart security bundle environment mismatch")
-            return bundle
-        except (OSError, ValueError):
-            return EmbeddedChartSecurityBundle(
+        except (OSError, ValueError) as error:
+            logger.warning("Embedded-chart security bundle unavailable; disabling charts: %s", error)
+            bundle = EmbeddedChartSecurityBundle(
                 digest="",
                 environment="invalid",
                 enabled=False,
@@ -93,6 +105,9 @@ class Settings(BaseSettings):
                 parent_origin=None,
                 wrapper_origin=None,
             )
+        self._embedded_chart_bundle_cache = bundle
+        self._embedded_chart_bundle_cache_key = cache_key
+        return bundle
 
     @model_validator(mode="after")
     def validate_session_settings(self) -> "Settings":

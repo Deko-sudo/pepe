@@ -61,7 +61,9 @@ def _canonical_origin(value: object, *, environment: str, field: str) -> str:
     if parsed.hostname.lower().endswith("tradingview.com"):
         raise ValueError(f"{field} must not be a provider origin")
     if field == "wrapper_origin":
-        return canonical_wrapper_origin(value, environment=environment)
+        # Preserve the wrapper's stricter navigation-origin validation, but use
+        # the same representation as parent_origin for the same-origin check.
+        canonical_wrapper_origin(value, environment=environment)
     port = (
         f":{parsed.port}"
         if parsed.port is not None
@@ -71,7 +73,7 @@ def _canonical_origin(value: object, *, environment: str, field: str) -> str:
         )
         else ""
     )
-    return f"{parsed.scheme}://{parsed.hostname.lower()}{port}"
+    return f"{parsed.scheme.lower()}://{parsed.hostname.lower().rstrip('.')}{port}"
 
 
 def _blocked_state(manifest: dict[str, object]) -> EmbeddedChartSecurityBundle:
@@ -250,11 +252,17 @@ def compile_security_bundle(
         backup = output.with_name(f".{output.name}.previous")
         if backup.exists():
             shutil.rmtree(backup)
-        if output.exists():
+        had_previous = output.exists()
+        if had_previous:
             os.replace(output, backup)
-        os.replace(temporary, output)
+        try:
+            os.replace(temporary, output)
+        except BaseException:
+            if had_previous:
+                os.replace(backup, output)
+            raise
         if backup.exists():
-            shutil.rmtree(backup)
+            shutil.rmtree(backup, ignore_errors=True)
     except BaseException:
         shutil.rmtree(temporary, ignore_errors=True)
         raise
